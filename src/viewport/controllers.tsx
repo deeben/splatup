@@ -96,8 +96,46 @@ export function ToolController() {
           }
           break;
         }
+        case 'polyShape': {
+          const s = snapAt(e);
+          if (!s) return;
+          const pts = st.drawingPoints;
+          // If 3 or more points and clicked near point 0, close and create polygon!
+          if (pts.length >= 3) {
+            const p0 = pts[0];
+            const distToP0 = Math.hypot(s.point[0] - p0[0], s.point[1] - p0[1], s.point[2] - p0[2]);
+            if (distToP0 < 100) {
+              st.addPolyShape(pts);
+              st.setStatus('Platform / Duct polygon created');
+              return;
+            }
+          }
+          st.addDrawingPoint(s.point);
+          const count = pts.length + 1;
+          if (count < 3) {
+            st.setStatus(`Point ${count} added · click next corner · Esc to cancel`);
+          } else {
+            st.setStatus(`Point ${count} added · click 1st point or press Enter to close · Esc to cancel`);
+          }
+          break;
+        }
+        case 'handrail': {
+          const s = snapAt(e);
+          if (!s) return;
+          const pts = st.drawingPoints;
+          if (pts.length === 0) {
+            st.addDrawingPoint(s.point);
+            st.setStatus('Click end point of Monowills handrail run · Esc to cancel');
+          } else {
+            st.addHandrail([...pts, s.point]);
+            st.setStatus('Monowills handrail run placed');
+          }
+          break;
+        }
         case 'box':
-        case 'cylinder': {
+        case 'cylinder':
+        case 'gate':
+        case 'ladder': {
           const s = snapAt(e);
           if (!s) {
             st.setStatus('Click on the scan to place the object');

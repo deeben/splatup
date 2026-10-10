@@ -22,6 +22,10 @@ const paths: Record<string, string> = {
   magnet: 'M6 3v8a6 6 0 0012 0V3h-4v8a2 2 0 01-4 0V3zM6 7h4M14 7h4',
   scan: 'M3 7V3h4M17 3h4v4M21 17v4h-4M7 21H3v-4M7 12h10',
   ruler: 'M3 17L17 3l4 4L7 21zM7 13l2 2M10 10l2 2M13 7l2 2',
+  polyShape: 'M12 2l8 4.5v9L12 20l-8-4.5v-9L12 2zM12 2v18M20 6.5L12 11 4 6.5',
+  handrail: 'M3 7h18M3 13h18M3 19h18M5 7v12M12 7v12M19 7v12',
+  gate: 'M3 5v14M7 6h10v12H7zM7 11h10M17 11v2M21 5v14',
+  ladder: 'M7 2v20M17 2v20M7 6h10M7 10h10M7 14h10M7 18h10',
 };
 
 export function Icon({ name, size = 18 }: { name: keyof typeof paths | string; size?: number }) {

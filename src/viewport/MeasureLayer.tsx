@@ -15,6 +15,7 @@ export function MeasureLayer() {
   const pendingA = useApp((s) => s.pendingA);
   const hover = useApp((s) => s.hover);
   const tool = useApp((s) => s.tool);
+  const drawingPoints = useApp((s) => s.drawingPoints);
 
   const selId = selection?.type === 'measurement' ? selection.id : null;
 
@@ -25,7 +26,65 @@ export function MeasureLayer() {
       ))}
       {pendingA && hover && tool === 'measure' && <PreviewLine a={pendingA} hover={hover} />}
       {pendingA && tool === 'measure' && <Endpoint p={pendingA} color="#facc15" />}
+      {(tool === 'polyShape' || tool === 'handrail') && drawingPoints.length > 0 && (
+        <DrawingPreview points={drawingPoints} hover={hover} tool={tool} />
+      )}
       {hover && tool !== 'select' && <SnapMarker hover={hover} />}
+    </group>
+  );
+}
+
+function DrawingPreview({
+  points,
+  hover,
+  tool,
+}: {
+  points: Vec3[];
+  hover: SnapResult | null;
+  tool: 'polyShape' | 'handrail';
+}) {
+  const worldPts = points.map(userToWorldTuple);
+  const color = tool === 'polyShape' ? '#10b981' : '#facc15';
+
+  return (
+    <group name="drawing-preview">
+      {/* Placed vertices */}
+      {points.map((p, i) => (
+        <Endpoint key={i} p={p} color={color} />
+      ))}
+
+      {/* Solid line between placed points */}
+      {worldPts.length >= 2 && (
+        <Line points={worldPts} color={color} lineWidth={3} depthTest={false} renderOrder={10} />
+      )}
+
+      {/* Rubberband line to cursor */}
+      {hover && worldPts.length >= 1 && (
+        <Line
+          points={[worldPts[worldPts.length - 1], userToWorldTuple(hover.point)]}
+          color="#38bdf8"
+          lineWidth={2}
+          dashed
+          dashSize={0.03}
+          gapSize={0.02}
+          depthTest={false}
+          renderOrder={10}
+        />
+      )}
+
+      {/* Preview closing line back to point 0 for polygons */}
+      {hover && tool === 'polyShape' && worldPts.length >= 2 && (
+        <Line
+          points={[userToWorldTuple(hover.point), worldPts[0]]}
+          color="#10b981"
+          lineWidth={1.5}
+          dashed
+          dashSize={0.02}
+          gapSize={0.02}
+          depthTest={false}
+          renderOrder={10}
+        />
+      )}
     </group>
   );
 }

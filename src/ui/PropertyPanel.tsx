@@ -2,7 +2,15 @@ import { useApp } from '../core/store';
 import { NumberField, TextField } from './fields';
 import { fmtBytes, fmtMm, measureParts } from '../core/units';
 import { Icon } from './Icon';
-import type { BoxObject, CylinderObject } from '../core/types';
+import type {
+  BoxObject,
+  CylinderObject,
+  HandrailObject,
+  LadderObject,
+  PolyShapeObject,
+  SwingGateObject,
+} from '../core/types';
+import { computePolyMetrics } from '../viewport/geometry/polyPrism';
 
 const COLOR_PRESETS = [
   { label: 'Amber (Duct)', color: '#f59e0b' },
@@ -133,6 +141,308 @@ export function PropertyPanel() {
                 />
               </>
             )}
+
+            {obj.kind === 'polyShape' && (() => {
+              const po = obj as PolyShapeObject;
+              const metrics = computePolyMetrics(po.points, po.thickness);
+              return (
+                <>
+                  <div className="kpi-grid" style={{ marginBottom: 8 }}>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Planar Area</div>
+                      <div className="kpi-value-sm">{metrics.areaM2.toFixed(2)} m²</div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Perimeter</div>
+                      <div className="kpi-value-sm">{fmtMm(metrics.perimeterMm)}</div>
+                    </div>
+                  </div>
+                  <NumberField
+                    label="Thickness"
+                    value={po.thickness}
+                    min={1}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as PolyShapeObject).thickness = v;
+                      })
+                    }
+                  />
+                  <div className="info-row">
+                    <span>Vertices:</span>
+                    <span className="info-val">{po.points.length} points</span>
+                  </div>
+                </>
+              );
+            })()}
+
+            {obj.kind === 'handrail' && (() => {
+              const ho = obj as HandrailObject;
+              let totalLengthMm = 0;
+              for (let i = 0; i < ho.points.length - 1; i++) {
+                const a = ho.points[i];
+                const b = ho.points[i + 1];
+                totalLengthMm += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+              }
+              const stanchionCount = Math.max(2, Math.ceil(totalLengthMm / ho.stanchionSpacing) + 1);
+
+              return (
+                <>
+                  <div className="kpi-grid" style={{ marginBottom: 8 }}>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Run Length</div>
+                      <div className="kpi-value-sm">{(totalLengthMm / 1000).toFixed(2)} m</div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Stanchions</div>
+                      <div className="kpi-value-sm">{stanchionCount} posts</div>
+                    </div>
+                  </div>
+
+                  <div className="field">
+                    <span className="field-label">Height (AS 1657)</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 8px',
+                          background: ho.height === 1000 ? '#facc15' : undefined,
+                          color: ho.height === 1000 ? '#000' : undefined,
+                          fontWeight: ho.height === 1000 ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as HandrailObject).height = 1000;
+                          })
+                        }
+                      >
+                        1000 mm (Std)
+                      </button>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 8px',
+                          background: ho.height === 900 ? '#facc15' : undefined,
+                          color: ho.height === 900 ? '#000' : undefined,
+                          fontWeight: ho.height === 900 ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as HandrailObject).height = 900;
+                          })
+                        }
+                      >
+                        900 mm
+                      </button>
+                    </div>
+                  </div>
+
+                  <NumberField
+                    label="Post Spacing"
+                    value={ho.stanchionSpacing}
+                    min={500}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as HandrailObject).stanchionSpacing = v;
+                      })
+                    }
+                  />
+
+                  <NumberField
+                    label="Pipe OD"
+                    value={ho.pipeDiameter}
+                    min={25}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as HandrailObject).pipeDiameter = v;
+                      })
+                    }
+                  />
+
+                  <label className="toggle-row">
+                    <span>100mm Kickplate (Toeboard)</span>
+                    <input
+                      type="checkbox"
+                      checked={ho.hasKickplate}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as HandrailObject).hasKickplate = e.target.checked;
+                        })
+                      }
+                    />
+                  </label>
+
+                  <label className="toggle-row">
+                    <span>Mid / Knee Rail</span>
+                    <input
+                      type="checkbox"
+                      checked={ho.hasMidrail}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as HandrailObject).hasMidrail = e.target.checked;
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              );
+            })()}
+
+            {obj.kind === 'gate' && (() => {
+              const go = obj as SwingGateObject;
+              return (
+                <>
+                  <NumberField
+                    label="Clear Opening"
+                    value={go.width}
+                    min={400}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as SwingGateObject).width = v;
+                      })
+                    }
+                  />
+                  <div className="field">
+                    <span className="field-label">Height</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 8px',
+                          background: go.height === 1000 ? '#facc15' : undefined,
+                          color: go.height === 1000 ? '#000' : undefined,
+                          fontWeight: go.height === 1000 ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as SwingGateObject).height = 1000;
+                          })
+                        }
+                      >
+                        1000 mm
+                      </button>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 8px',
+                          background: go.height === 900 ? '#facc15' : undefined,
+                          color: go.height === 900 ? '#000' : undefined,
+                          fontWeight: go.height === 900 ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as SwingGateObject).height = 900;
+                          })
+                        }
+                      >
+                        900 mm
+                      </button>
+                    </div>
+                  </div>
+
+                  <label className="slider-row">
+                    <div className="slider-label-row">
+                      <span>Swing Angle</span>
+                      <span>{Math.round(go.swingAngle)}°</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="90"
+                      step="5"
+                      value={go.swingAngle}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as SwingGateObject).swingAngle = parseFloat(e.target.value);
+                        })
+                      }
+                    />
+                  </label>
+
+                  <label className="toggle-row">
+                    <span>Bottom Toe Bar</span>
+                    <input
+                      type="checkbox"
+                      checked={go.hasKickplate}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as SwingGateObject).hasKickplate = e.target.checked;
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              );
+            })()}
+
+            {obj.kind === 'ladder' && (() => {
+              const lo = obj as LadderObject;
+              const rungCount = Math.floor(lo.height / lo.rungSpacing);
+              return (
+                <>
+                  <div className="kpi-grid" style={{ marginBottom: 8 }}>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Vertical Climb</div>
+                      <div className="kpi-value-sm">{fmtMm(lo.height)}</div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Rungs</div>
+                      <div className="kpi-value-sm">{rungCount} rungs</div>
+                    </div>
+                  </div>
+
+                  <NumberField
+                    label="Climb Height"
+                    value={lo.height}
+                    min={500}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as LadderObject).height = v;
+                      })
+                    }
+                  />
+
+                  <NumberField
+                    label="Clear Width"
+                    value={lo.width}
+                    min={300}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as LadderObject).width = v;
+                      })
+                    }
+                  />
+
+                  <NumberField
+                    label="Rung Spacing"
+                    value={lo.rungSpacing}
+                    min={200}
+                    max={350}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as LadderObject).rungSpacing = v;
+                      })
+                    }
+                  />
+
+                  <label className="toggle-row">
+                    <span>Safety Cage (AS 1657 &gt;3m)</span>
+                    <input
+                      type="checkbox"
+                      checked={lo.hasCage}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as LadderObject).hasCage = e.target.checked;
+                        })
+                      }
+                    />
+                  </label>
+                </>
+              );
+            })()}
           </div>
 
           {/* Position Section */}

@@ -102,10 +102,11 @@ export function App() {
 
                 <div className="welcome-shortcuts">
                   <div><strong>M</strong> Measure</div>
-                  <div><strong>B</strong> Box / Duct</div>
-                  <div><strong>C</strong> Cylinder / Pipe</div>
+                  <div><strong>P</strong> Shape / Slab</div>
+                  <div><strong>H</strong> Handrail</div>
+                  <div><strong>B</strong> Box</div>
+                  <div><strong>Q</strong> Object / World</div>
                   <div><strong>F</strong> Center Camera</div>
-                  <div><strong>Shift</strong> Axis Lock</div>
                 </div>
               </div>
             </div>

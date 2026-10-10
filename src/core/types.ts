@@ -45,7 +45,69 @@ export interface CylinderObject extends BaseObject {
   length: number;
 }
 
-export type DesignObject = BoxObject | CylinderObject;
+/** Custom 3D polygon prism for transition ducts, offset ducting, or platform floor slabs. */
+export interface PolyShapeObject extends BaseObject {
+  kind: 'polyShape';
+  /** Vertices in user frame mm, local to object origin. */
+  points: Vec3[];
+  /** Extrusion height / slab thickness in mm (along Z/normal). */
+  thickness: number;
+  /** Whether the shape is a hollow duct section. */
+  isHollow?: boolean;
+}
+
+/** Monowills-style industrial handrail (AS 1657) with ball stanchions and toeboard. */
+export interface HandrailObject extends BaseObject {
+  kind: 'handrail';
+  /** Path points (mm, local to object origin). Minimum 2 points for a straight run. */
+  points: Vec3[];
+  /** Monowills standard height: 900mm or 1000mm. */
+  height: 900 | 1000;
+  /** Stanchion spacing along the run (mm, standard 1500mm, max 2000mm per AS 1657). */
+  stanchionSpacing: number;
+  /** Include 100mm kickplate / toeboard along bottom edge. */
+  hasKickplate: boolean;
+  /** Include knee rail (mid rail). */
+  hasMidrail: boolean;
+  /** Pipe outer diameter (mm, standard 42.4mm for 32NB). */
+  pipeDiameter: number;
+}
+
+/** Monowills self-closing safety swing gate module. */
+export interface SwingGateObject extends BaseObject {
+  kind: 'gate';
+  /** Clear opening width in mm (standard 750mm). */
+  width: number;
+  /** Height in mm (900mm or 1000mm). */
+  height: 900 | 1000;
+  /** Swing angle (degrees, 0 = closed, 90 = open). */
+  swingAngle: number;
+  /** Include toeboard. */
+  hasKickplate: boolean;
+}
+
+/** Industrial access ladder per AS 1657 with rungs and optional safety cage. */
+export interface LadderObject extends BaseObject {
+  kind: 'ladder';
+  /** Total vertical climb height (mm). */
+  height: number;
+  /** Clear width between stringers (mm, standard 450mm). */
+  width: number;
+  /** Centre-to-centre rung spacing (mm, standard 280mm). */
+  rungSpacing: number;
+  /** Include safety cage (standard for climb > 3000mm). */
+  hasCage: boolean;
+  /** Clearance height before cage starts (mm, standard 2200mm). */
+  cageStartHeight: number;
+}
+
+export type DesignObject =
+  | BoxObject
+  | CylinderObject
+  | PolyShapeObject
+  | HandrailObject
+  | SwingGateObject
+  | LadderObject;
 export type DesignKind = DesignObject['kind'];
 
 export interface Measurement {
@@ -88,7 +150,15 @@ export type Selection =
   | { type: 'scan'; id: string }
   | null;
 
-export type Tool = 'select' | 'measure' | 'box' | 'cylinder';
+export type Tool =
+  | 'select'
+  | 'measure'
+  | 'box'
+  | 'cylinder'
+  | 'polyShape'
+  | 'handrail'
+  | 'gate'
+  | 'ladder';
 
 export type SnapKind = 'vertex' | 'corner' | 'face' | 'axis';
 

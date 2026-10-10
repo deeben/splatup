@@ -16,6 +16,11 @@ export function useShortcuts() {
   const select = useApp((s) => s.select);
   const pendingA = useApp((s) => s.pendingA);
   const setPendingA = useApp((s) => s.setPendingA);
+  const drawingPoints = useApp((s) => s.drawingPoints);
+  const popDrawingPoint = useApp((s) => s.popDrawingPoint);
+  const clearDrawingPoints = useApp((s) => s.clearDrawingPoints);
+  const addPolyShape = useApp((s) => s.addPolyShape);
+  const addHandrail = useApp((s) => s.addHandrail);
   const requestFrame = useApp((s) => s.requestFrame);
 
   useEffect(() => {
@@ -67,6 +72,12 @@ export function useShortcuts() {
         case 'c':
           setTool('cylinder');
           break;
+        case 'p':
+          setTool('polyShape');
+          break;
+        case 'h':
+          setTool('handrail');
+          break;
         case 'w':
           setGizmoMode('translate');
           break;
@@ -82,13 +93,28 @@ export function useShortcuts() {
         case 'f':
           requestFrame();
           break;
+        case 'enter':
+          if (tool === 'polyShape' && drawingPoints.length >= 3) {
+            e.preventDefault();
+            addPolyShape(drawingPoints);
+          } else if (tool === 'handrail' && drawingPoints.length >= 2) {
+            e.preventDefault();
+            addHandrail(drawingPoints);
+          }
+          break;
         case 'delete':
         case 'backspace':
           e.preventDefault();
-          deleteSelection();
+          if (drawingPoints.length > 0) {
+            popDrawingPoint();
+          } else {
+            deleteSelection();
+          }
           break;
         case 'escape':
-          if (pendingA) {
+          if (drawingPoints.length > 0) {
+            clearDrawingPoints();
+          } else if (pendingA) {
             setPendingA(null);
           } else if (tool !== 'select') {
             setTool('select');
@@ -116,6 +142,11 @@ export function useShortcuts() {
     select,
     pendingA,
     setPendingA,
+    drawingPoints,
+    popDrawingPoint,
+    clearDrawingPoints,
+    addPolyShape,
+    addHandrail,
     requestFrame,
   ]);
 }

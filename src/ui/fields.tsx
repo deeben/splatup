@@ -7,6 +7,7 @@ interface NumberFieldProps {
   onCommit: (v: number) => void;
   suffix?: string;
   min?: number;
+  max?: number;
   title?: string;
 }
 
@@ -14,7 +15,7 @@ interface NumberFieldProps {
  * Numeric input that commits on Enter/blur (one undo step per edit) and
  * accepts arithmetic, e.g. "1200+2*50".
  */
-export function NumberField({ label, value, onCommit, suffix = 'mm', min, title }: NumberFieldProps) {
+export function NumberField({ label, value, onCommit, suffix = 'mm', min, max, title }: NumberFieldProps) {
   const [text, setText] = useState(fmtNum(value));
   const [invalid, setInvalid] = useState(false);
 
@@ -25,7 +26,7 @@ export function NumberField({ label, value, onCommit, suffix = 'mm', min, title 
 
   const commit = () => {
     const v = evalExpr(text);
-    if (v == null || (min != null && v < min)) {
+    if (v == null || (min != null && v < min) || (max != null && v > max)) {
       setInvalid(true);
       return;
     }

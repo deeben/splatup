@@ -87,10 +87,18 @@ export function Sidebar() {
                 <button
                   type="button"
                   className="mini-add-btn"
-                  onClick={() => setTool('cylinder')}
-                  title="Add Cylinder / Duct"
+                  onClick={() => setTool('polyShape')}
+                  title="Draw Custom Shape / Platform (P)"
                 >
-                  + Cyl
+                  + Shape
+                </button>
+                <button
+                  type="button"
+                  className="mini-add-btn"
+                  onClick={() => setTool('handrail')}
+                  title="Draw Monowills Handrail Run (H)"
+                >
+                  + Rail
                 </button>
               </div>
             </div>

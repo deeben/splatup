@@ -1,12 +1,22 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Color, type Group, type Object3D } from 'three';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { BufferGeometry, Color, type Group, type Object3D } from 'three';
 import { Edges, TransformControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { useApp } from '../core/store';
 import { eulerToUserRot, mm, userRotToEuler, userToWorldTuple, worldToUser } from '../core/frame';
 import { registry } from './registry';
-import type { DesignObject } from '../core/types';
+import type {
+  BoxObject,
+  CylinderObject,
+  DesignObject,
+  HandrailObject,
+  LadderObject,
+  PolyShapeObject,
+  SwingGateObject,
+} from '../core/types';
+import { buildPolyPrismGeometry } from './geometry/polyPrism';
+import { buildAccessLadder, buildMonowillsHandrail, buildSwingGate } from './geometry/monowills';
 
 export function DesignLayer() {
   const objects = useApp((s) => s.doc.objects);
@@ -42,7 +52,8 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
     [obj.color, selected],
   );
 
-  const { geometry, offsetY, snapPoints } = useMemo(() => shapeFor(obj), [obj]);
+  const { geometry, offsetY, snapPoints, showEdges } = useMemo(() => shapeFor(obj), [obj]);
+  const isBufferGeom = geometry instanceof BufferGeometry;
 
   return (
     <group
@@ -52,19 +63,23 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
       visible={obj.visible}
       userData={{ objectId: obj.id, snapPoints }}
     >
-      <mesh position={[0, offsetY, 0]} renderOrder={2}>
-        {geometry}
+      <mesh
+        geometry={isBufferGeom ? geometry : undefined}
+        position={[0, offsetY, 0]}
+        renderOrder={2}
+      >
+        {!isBufferGeom && (geometry as ReactNode)}
         <meshStandardMaterial
           color={obj.color}
           transparent
-          opacity={selected ? 0.9 : 0.78}
-          roughness={0.6}
-          metalness={0.1}
+          opacity={selected ? 0.92 : 0.82}
+          roughness={0.5}
+          metalness={0.15}
           polygonOffset
           polygonOffsetFactor={1}
           polygonOffsetUnits={1}
         />
-        <Edges color={edgeColor} threshold={20} userData={{ noPick: true }} />
+        {showEdges && <Edges color={edgeColor} threshold={20} userData={{ noPick: true }} />}
       </mesh>
     </group>
   );
@@ -73,36 +88,108 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
 /** Geometry (metres, three frame) + snap points in group-local coordinates. */
 function shapeFor(obj: DesignObject) {
   if (obj.kind === 'box') {
-    const L = mm(obj.length);
-    const H = mm(obj.height);
-    const W = mm(obj.width); // user Y ↔ three -Z
+    const o = obj as BoxObject;
+    const L = mm(o.length);
+    const H = mm(o.height);
+    const W = mm(o.width); // user Y ↔ three -Z
     const xs = [-L / 2, 0, L / 2];
     const ys = [0, H / 2, H];
     const zs = [-W / 2, 0, W / 2];
     const snapPoints: [number, number, number][] = [];
-    // Corners, edge midpoints and face centres (all 27 lattice points except the body centre).
-    for (const x of xs) for (const y of ys) for (const z of zs) if (!(x === 0 && y === H / 2 && z === 0)) snapPoints.push([x, y, z]);
+    for (const x of xs) {
+      for (const y of ys) {
+        for (const z of zs) {
+          if (!(x === 0 && y === H / 2 && z === 0)) snapPoints.push([x, y, z]);
+        }
+      }
+    }
     return {
       geometry: <boxGeometry args={[L, H, W]} />,
       offsetY: H / 2,
       snapPoints,
+      showEdges: true,
     };
   }
-  const r = mm(obj.diameter) / 2;
-  const len = mm(obj.length);
-  const snapPoints: [number, number, number][] = [
-    [0, 0, 0],
-    [0, len, 0],
-    [0, len / 2, 0],
-  ];
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    snapPoints.push([Math.cos(a) * r, 0, Math.sin(a) * r], [Math.cos(a) * r, len, Math.sin(a) * r]);
+
+  if (obj.kind === 'cylinder') {
+    const o = obj as CylinderObject;
+    const r = mm(o.diameter) / 2;
+    const len = mm(o.length);
+    const snapPoints: [number, number, number][] = [
+      [0, 0, 0],
+      [0, len, 0],
+      [0, len / 2, 0],
+    ];
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      snapPoints.push([Math.cos(a) * r, 0, Math.sin(a) * r], [Math.cos(a) * r, len, Math.sin(a) * r]);
+    }
+    return {
+      geometry: <cylinderGeometry args={[r, r, len, 48]} />,
+      offsetY: len / 2,
+      snapPoints,
+      showEdges: true,
+    };
   }
+
+  if (obj.kind === 'polyShape') {
+    const o = obj as PolyShapeObject;
+    const geom = buildPolyPrismGeometry(o.points, o.thickness);
+    const snapPoints: [number, number, number][] = [];
+    const thickM = mm(o.thickness);
+    for (const p of o.points) {
+      const bx = mm(p[0]);
+      const by = mm(p[2]);
+      const bz = -mm(p[1]);
+      snapPoints.push([bx, by, bz]);
+      snapPoints.push([bx, by + thickM, bz]);
+    }
+    return {
+      geometry: geom,
+      offsetY: 0,
+      snapPoints,
+      showEdges: true,
+    };
+  }
+
+  if (obj.kind === 'handrail') {
+    const o = obj as HandrailObject;
+    const res = buildMonowillsHandrail(o);
+    return {
+      geometry: res.geometry,
+      offsetY: 0,
+      snapPoints: res.snapPoints,
+      showEdges: false,
+    };
+  }
+
+  if (obj.kind === 'gate') {
+    const o = obj as SwingGateObject;
+    const res = buildSwingGate(o);
+    return {
+      geometry: res.geometry,
+      offsetY: 0,
+      snapPoints: res.snapPoints,
+      showEdges: false,
+    };
+  }
+
+  if (obj.kind === 'ladder') {
+    const o = obj as LadderObject;
+    const res = buildAccessLadder(o);
+    return {
+      geometry: res.geometry,
+      offsetY: 0,
+      snapPoints: res.snapPoints,
+      showEdges: false,
+    };
+  }
+
   return {
-    geometry: <cylinderGeometry args={[r, r, len, 48]} />,
-    offsetY: len / 2,
-    snapPoints,
+    geometry: <boxGeometry args={[0.5, 0.5, 0.5]} />,
+    offsetY: 0.25,
+    snapPoints: [],
+    showEdges: true,
   };
 }
 

@@ -112,7 +112,14 @@ export async function exportMeasurementsCsv() {
   rows.push([]);
   rows.push(['Object', 'Type', 'L/Dia (mm)', 'W/Len (mm)', 'H (mm)', 'X', 'Y', 'Z', 'RotX', 'RotY', 'RotZ']);
   for (const o of doc.objects) {
-    const dims = o.kind === 'box' ? [o.length, o.width, o.height] : [o.diameter, o.length, ''];
+    let dims: (number | string)[] = ['', '', ''];
+    if (o.kind === 'box') dims = [o.length, o.width, o.height];
+    else if (o.kind === 'cylinder') dims = [o.diameter, o.length, ''];
+    else if (o.kind === 'polyShape') dims = [o.points.length + ' pts', '', o.thickness];
+    else if (o.kind === 'handrail') dims = [o.stanchionSpacing, '', o.height];
+    else if (o.kind === 'gate') dims = [o.width, '', o.height];
+    else if (o.kind === 'ladder') dims = [o.width, '', o.height];
+
     rows.push([o.name, o.kind, ...dims, ...o.transform.position, ...o.transform.rotation].map((v) =>
       typeof v === 'number' ? v.toFixed(1) : `"${String(v).replace(/"/g, '""')}"`,
     ));

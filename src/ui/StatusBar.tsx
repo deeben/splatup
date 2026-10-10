@@ -12,11 +12,19 @@ export function StatusBar() {
       ? pendingA
         ? 'Click 2nd point to finish · Hold Shift to lock axis · Esc to cancel'
         : 'Click 1st point on scan or block · Esc to cancel'
-      : tool === 'box'
-        ? 'Click on scan surface to place box · Esc to cancel'
-        : tool === 'cylinder'
-          ? 'Click on scan surface to place cylinder/duct · Esc to cancel'
-          : 'Double-click scan to orbit target · Left-drag orbit · Right/Mid-drag pan · Wheel zoom';
+      : tool === 'polyShape'
+        ? 'Click corners to draw platform/duct polygon · Click 1st point or Enter to close · Esc to cancel'
+        : tool === 'handrail'
+          ? 'Click start point of Monowills handrail · Click end point to place · Esc to cancel'
+          : tool === 'gate'
+            ? 'Click on floor/scan surface to place Monowills safety swing gate'
+            : tool === 'ladder'
+              ? 'Click on floor/scan surface to place AS 1657 access ladder'
+              : tool === 'box'
+                ? 'Click on scan surface to place box · Esc to cancel'
+                : tool === 'cylinder'
+                  ? 'Click on scan surface to place cylinder/duct · Esc to cancel'
+                  : 'Double-click scan to orbit target · Left-drag orbit · Right/Mid-drag pan · Wheel zoom';
 
   const displayStatus = status || defaultHint;
 

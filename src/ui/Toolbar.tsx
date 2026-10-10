@@ -25,6 +25,10 @@ export function Toolbar() {
     { id: 'measure', label: 'Measure (Snap)', icon: 'measure', shortcut: 'M' },
     { id: 'box', label: 'Add Box / Duct Block', icon: 'box', shortcut: 'B' },
     { id: 'cylinder', label: 'Add Cylinder / Pipe', icon: 'cylinder', shortcut: 'C' },
+    { id: 'polyShape', label: 'Custom Shape / Platform (Points)', icon: 'polyShape', shortcut: 'P' },
+    { id: 'handrail', label: 'Monowills Handrail (Run)', icon: 'handrail', shortcut: 'H' },
+    { id: 'gate', label: 'Safety Swing Gate', icon: 'gate', shortcut: '' },
+    { id: 'ladder', label: 'Access Ladder (AS 1657)', icon: 'ladder', shortcut: '' },
   ];
 
   return (
