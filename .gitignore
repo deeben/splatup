@@ -1,0 +1,11 @@
+node_modules
+dist
+.wrangler
+.DS_Store
+*.log
+
+# Sample scans (large binaries) – keep out of git
+/FBX
+/GLB
+/LAS
+/PLY
