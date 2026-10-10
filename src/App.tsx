@@ -17,7 +17,6 @@ export function App() {
   const scansCount = useApp((s) => s.doc.scans.length);
   const objectsCount = useApp((s) => s.doc.objects.length);
   const addScan = useApp((s) => s.addScan);
-  const setStatus = useApp((s) => s.setStatus);
 
   useEffect(() => {
     (async () => {

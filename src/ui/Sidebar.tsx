@@ -100,6 +100,22 @@ export function Sidebar() {
                 >
                   + Rail
                 </button>
+                <button
+                  type="button"
+                  className="mini-add-btn"
+                  onClick={() => setTool('stairs')}
+                  title="Draw / Place Industrial Stairs (T)"
+                >
+                  + Stairs
+                </button>
+                <button
+                  type="button"
+                  className="mini-add-btn"
+                  onClick={() => setTool('beam')}
+                  title="Draw / Place Steel Beam (S)"
+                >
+                  + Beam
+                </button>
               </div>
             </div>
 

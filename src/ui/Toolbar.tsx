@@ -30,6 +30,8 @@ export function Toolbar() {
     { id: 'handrail', label: 'Monowills Handrail (Run)', icon: 'handrail', shortcut: 'H' },
     { id: 'gate', label: 'Safety Swing Gate', icon: 'gate', shortcut: '' },
     { id: 'ladder', label: 'Access Ladder (AS 1657)', icon: 'ladder', shortcut: '' },
+    { id: 'stairs', label: 'Industrial Stairs (AS 1657)', icon: 'stairs', shortcut: 'T' },
+    { id: 'beam', label: 'Structural Steel Beam (Aus)', icon: 'beam', shortcut: 'S' },
   ];
 
   return (

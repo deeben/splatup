@@ -3,6 +3,7 @@ dist
 .wrangler
 .DS_Store
 *.log
+*.tsbuildinfo
 
 # Sample scans (large binaries) – keep out of git
 /FBX

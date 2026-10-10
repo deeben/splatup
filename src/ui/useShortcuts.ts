@@ -60,7 +60,6 @@ export function useShortcuts() {
 
       switch (e.key.toLowerCase()) {
         case 'v':
-        case 's':
           setTool('select');
           break;
         case 'm':
@@ -80,6 +79,12 @@ export function useShortcuts() {
           break;
         case 'h':
           setTool('handrail');
+          break;
+        case 't':
+          setTool('stairs');
+          break;
+        case 's':
+          setTool('beam');
           break;
         case 'w':
           setGizmoMode('translate');

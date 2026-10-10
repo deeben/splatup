@@ -5,7 +5,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useApp } from '../core/store';
 import { axisLock, pick } from './pick';
 import { registry } from './registry';
-import type { SnapResult } from '../core/types';
+import type { SnapResult, StairsObject, SteelBeamObject } from '../core/types';
 
 const CLICK_TOLERANCE_PX = 5;
 
@@ -151,6 +151,72 @@ export function ToolController() {
           } else {
             st.addHandrail([...pts, s.point]);
             st.setStatus('Monowills handrail run placed');
+          }
+          break;
+        }
+        case 'beam': {
+          const s = snapAt(e);
+          if (!s) return;
+          const pts = st.drawingPoints;
+          if (pts.length === 0) {
+            st.addDrawingPoint(s.point);
+            st.setStatus('Click end point of steel beam · Esc to cancel');
+          } else {
+            const p1 = pts[0];
+            const p2 = s.point;
+            const dx = p2[0] - p1[0];
+            const dy = p2[1] - p1[1];
+            const dz = p2[2] - p1[2];
+            const len = Math.round(Math.hypot(dx, dy, dz));
+            const yawRad = Math.atan2(dy, dx);
+            const yawDeg = Math.round(((yawRad * 180) / Math.PI) * 10) / 10;
+            const pitchRad = Math.atan2(dz, Math.hypot(dx, dy));
+            const pitchDeg = Math.round(((pitchRad * 180) / Math.PI) * 10) / 10;
+            const id = st.addObject('beam', p1.map((v) => Math.round(v)) as typeof p1);
+            st.updateObject(id, (o) => {
+              const bo = o as SteelBeamObject;
+              bo.length = Math.max(100, len);
+              bo.transform.rotation = [0, -pitchDeg, yawDeg];
+            });
+            st.clearDrawingPoints();
+            st.setTool('select');
+            st.setStatus(`Steel beam (${len} mm) placed`);
+          }
+          break;
+        }
+        case 'stairs': {
+          const s = snapAt(e);
+          if (!s) return;
+          const pts = st.drawingPoints;
+          if (pts.length === 0) {
+            st.addDrawingPoint(s.point);
+            st.setStatus('Click top landing point of industrial stairs · Esc to cancel');
+          } else {
+            const p1 = pts[0];
+            const p2 = s.point;
+            const isP1Lower = p1[2] <= p2[2];
+            const bottom = isP1Lower ? p1 : p2;
+            const top = isP1Lower ? p2 : p1;
+            const dx = top[0] - bottom[0];
+            const dy = top[1] - bottom[1];
+            const dz = Math.max(200, Math.round(top[2] - bottom[2]));
+            const horizDist = Math.max(200, Math.round(Math.hypot(dx, dy)));
+            const yawRad = Math.atan2(dy, dx);
+            const yawDeg = Math.round(((yawRad * 180) / Math.PI) * 10) / 10;
+            const numSteps = Math.max(1, Math.round(dz / 190));
+            const going = Math.round(horizDist / numSteps);
+
+            const id = st.addObject('stairs', bottom.map((v) => Math.round(v)) as typeof bottom);
+            st.updateObject(id, (o) => {
+              const so = o as StairsObject;
+              so.totalRise = dz;
+              so.going = Math.max(200, going);
+              so.numSteps = numSteps;
+              so.transform.rotation = [0, 0, yawDeg];
+            });
+            st.clearDrawingPoints();
+            st.setTool('select');
+            st.setStatus(`Industrial stairs (Rise: ${dz} mm, ${numSteps} steps) placed`);
           }
           break;
         }

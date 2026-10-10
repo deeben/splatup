@@ -28,7 +28,7 @@ export function MeasureLayer() {
       {pendingA && tool === 'measure' && <Endpoint p={pendingA} color="#facc15" />}
       {pendingA && hover && tool === 'align' && <AlignPreview a={pendingA} hover={hover} />}
       {pendingA && tool === 'align' && <Endpoint p={pendingA} color="#38bdf8" />}
-      {(tool === 'polyShape' || tool === 'handrail') && drawingPoints.length > 0 && (
+      {(tool === 'polyShape' || tool === 'handrail' || tool === 'stairs' || tool === 'beam') && drawingPoints.length > 0 && (
         <DrawingPreview points={drawingPoints} hover={hover} tool={tool} />
       )}
       {hover && tool !== 'select' && <SnapMarker hover={hover} />}
@@ -43,10 +43,10 @@ function DrawingPreview({
 }: {
   points: Vec3[];
   hover: SnapResult | null;
-  tool: 'polyShape' | 'handrail';
+  tool: 'polyShape' | 'handrail' | 'stairs' | 'beam';
 }) {
   const worldPts = points.map(userToWorldTuple);
-  const color = tool === 'polyShape' ? '#10b981' : '#facc15';
+  const color = tool === 'polyShape' ? '#10b981' : tool === 'beam' ? '#64748b' : '#f59e0b';
 
   return (
     <group name="drawing-preview">

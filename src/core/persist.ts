@@ -119,6 +119,8 @@ export async function exportMeasurementsCsv() {
     else if (o.kind === 'handrail') dims = [o.stanchionSpacing, '', o.height];
     else if (o.kind === 'gate') dims = [o.width, '', o.height];
     else if (o.kind === 'ladder') dims = [o.width, '', o.height];
+    else if (o.kind === 'stairs') dims = [o.width, o.numSteps * o.going, o.totalRise];
+    else if (o.kind === 'beam') dims = [o.length, o.sectionName, o.alignment];
 
     rows.push([o.name, o.kind, ...dims, ...o.transform.position, ...o.transform.rotation].map((v) =>
       typeof v === 'number' ? v.toFixed(1) : `"${String(v).replace(/"/g, '""')}"`,

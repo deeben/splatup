@@ -27,11 +27,15 @@ export function StatusBar() {
             ? 'Click on floor/scan surface to place Monowills safety swing gate'
             : tool === 'ladder'
               ? 'Click on floor/scan surface to place AS 1657 access ladder'
-              : tool === 'box'
-                ? 'Click on scan surface to place box · Esc to cancel'
-                : tool === 'cylinder'
-                  ? 'Click on scan surface to place cylinder/duct · Esc to cancel'
-                  : 'Double-click scan to orbit target · Left-drag orbit · Right/Mid-drag pan · Wheel zoom';
+              : tool === 'stairs'
+                ? 'Click bottom landing, then top landing to place AS 1657 stairs · Esc to cancel'
+                : tool === 'beam'
+                  ? 'Click start point, then end point to place steel beam · Esc to cancel'
+                  : tool === 'box'
+                    ? 'Click on scan surface to place box · Esc to cancel'
+                    : tool === 'cylinder'
+                      ? 'Click on scan surface to place cylinder/duct · Esc to cancel'
+                      : 'Double-click scan to orbit target · Left-drag orbit · Right/Mid-drag pan · Wheel zoom';
 
   const displayStatus = status || defaultHint;
 

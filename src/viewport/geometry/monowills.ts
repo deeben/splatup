@@ -179,12 +179,23 @@ export function buildMonowillsHandrail(obj: HandrailObject): {
 
     // Kickplate / Toeboard (100mm high strip along bottom)
     if (obj.hasKickplate) {
-      // Orient kickplate flat face facing normal to the run
-      const angle = Math.atan2(segDir.x, segDir.z);
-      const kickRot = new Quaternion().setFromAxisAngle(_up, angle + Math.PI / 2);
+      // Orient kickplate in 3D so it pitches and follows sloping runs/stairs
+      const tangent = segDir; // along the length
+      const horizontalNormal = new Vector3(-segDir.z, 0, segDir.x);
+      const normal = horizontalNormal.lengthSq() > 1e-6
+        ? horizontalNormal.normalize()
+        : new Vector3(0, 0, 1);
+      const kickUp = new Vector3().crossVectors(normal, tangent).normalize();
+
+      const kickRotM = new Matrix4().makeBasis(tangent, kickUp, normal);
+      const kickQuat = new Quaternion().setFromRotationMatrix(kickRotM);
+
+      const midBase = new Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+      const kickCenter = midBase.addScaledVector(kickUp, mm(55));
+
       const mKick = new Matrix4().compose(
-        new Vector3(railCenter.x, railCenter.y + mm(55), railCenter.z),
-        kickRot,
+        kickCenter,
+        kickQuat,
         new Vector3(segLen, 1, 1),
       );
       items.push({ geom: kickGeom, matrix: mKick });

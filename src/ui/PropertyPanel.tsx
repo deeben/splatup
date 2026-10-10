@@ -8,9 +8,13 @@ import type {
   HandrailObject,
   LadderObject,
   PolyShapeObject,
+  StairsObject,
+  SteelBeamObject,
   SwingGateObject,
 } from '../core/types';
 import { computePolyMetrics } from '../viewport/geometry/polyPrism';
+import { computeStairsMetrics } from '../viewport/geometry/stairs';
+import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
 
 const COLOR_PRESETS = [
   { label: 'Amber (Duct)', color: '#f59e0b' },
@@ -443,6 +447,393 @@ export function PropertyPanel() {
                       }
                     />
                   </label>
+                </>
+              );
+            })()}
+
+            {obj.kind === 'stairs' && (() => {
+              const so = obj as StairsObject;
+              const metrics = computeStairsMetrics(so);
+              return (
+                <>
+                  <div className={`compliance-badge ${metrics.isCompliant ? 'ok' : 'warn'}`}>
+                    <Icon name={metrics.isCompliant ? 'check' : 'warning'} size={14} />
+                    <span>{metrics.complianceMsg}</span>
+                  </div>
+
+                  <div className="kpi-grid" style={{ marginBottom: 8 }}>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Risers & Going</div>
+                      <div className="kpi-value-sm">
+                        {metrics.numRisers} @ {metrics.riseMm}mm
+                      </div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Total Run / Slope</div>
+                      <div className="kpi-value-sm">
+                        {fmtMm(metrics.totalRunMm)} ({metrics.slopeDeg}°)
+                      </div>
+                    </div>
+                  </div>
+
+                  <NumberField
+                    label="Floor Rise"
+                    value={so.totalRise}
+                    min={200}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        const s = o as StairsObject;
+                        s.totalRise = v;
+                        s.numSteps = Math.max(1, Math.round(v / 190));
+                      })
+                    }
+                  />
+
+                  <NumberField
+                    label="Steps (Risers)"
+                    value={so.numSteps}
+                    min={1}
+                    max={50}
+                    suffix=""
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as StairsObject).numSteps = Math.round(v);
+                      })
+                    }
+                  />
+
+                  <NumberField
+                    label="Tread Going"
+                    value={so.going}
+                    min={200}
+                    max={400}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as StairsObject).going = v;
+                      })
+                    }
+                  />
+
+                  <NumberField
+                    label="Clear Width"
+                    value={so.width}
+                    min={500}
+                    max={2000}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as StairsObject).width = v;
+                      })
+                    }
+                  />
+
+                  <div className="field">
+                    <span className="field-label">Stringer Channel</span>
+                    <select
+                      className="field-select"
+                      value={so.stringerSection}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as StairsObject).stringerSection = e.target.value as '200PFC' | '250PFC' | '150PFC';
+                        })
+                      }
+                    >
+                      <option value="200PFC">200 PFC (Standard)</option>
+                      <option value="250PFC">250 PFC (Heavy / Long)</option>
+                      <option value="150PFC">150 PFC (Light)</option>
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <span className="field-label">Handrails</span>
+                    <select
+                      className="field-select"
+                      value={so.handrailSide}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as StairsObject).handrailSide = e.target.value as 'both' | 'left' | 'right' | 'none';
+                        })
+                      }
+                    >
+                      <option value="both">Both Sides</option>
+                      <option value="left">Left Only</option>
+                      <option value="right">Right Only</option>
+                      <option value="none">None</option>
+                    </select>
+                  </div>
+
+                  {so.handrailSide !== 'none' && (
+                    <>
+                      <div className="field">
+                        <span className="field-label">Rail Height</span>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            type="button"
+                            className="mini-add-btn"
+                            style={{
+                              padding: '3px 8px',
+                              background: so.handrailHeight === 1000 ? '#facc15' : undefined,
+                              color: so.handrailHeight === 1000 ? '#000' : undefined,
+                              fontWeight: so.handrailHeight === 1000 ? 700 : 500,
+                            }}
+                            onClick={() =>
+                              updateObject(obj.id, (o) => {
+                                (o as StairsObject).handrailHeight = 1000;
+                              })
+                            }
+                          >
+                            1000 mm
+                          </button>
+                          <button
+                            type="button"
+                            className="mini-add-btn"
+                            style={{
+                              padding: '3px 8px',
+                              background: so.handrailHeight === 900 ? '#facc15' : undefined,
+                              color: so.handrailHeight === 900 ? '#000' : undefined,
+                              fontWeight: so.handrailHeight === 900 ? 700 : 500,
+                            }}
+                            onClick={() =>
+                              updateObject(obj.id, (o) => {
+                                (o as StairsObject).handrailHeight = 900;
+                              })
+                            }
+                          >
+                            900 mm (Std)
+                          </button>
+                        </div>
+                      </div>
+
+                      <label className="toggle-row">
+                        <span>100mm Sloping Kickplate</span>
+                        <input
+                          type="checkbox"
+                          checked={so.hasKickplate}
+                          onChange={(e) =>
+                            updateObject(obj.id, (o) => {
+                              (o as StairsObject).hasKickplate = e.target.checked;
+                            })
+                          }
+                        />
+                      </label>
+                    </>
+                  )}
+                </>
+              );
+            })()}
+
+            {obj.kind === 'beam' && (() => {
+              const bo = obj as SteelBeamObject;
+              const secDef = STEEL_CATALOGUE[bo.sectionName] ?? STEEL_CATALOGUE[DEFAULT_SECTION];
+              const totalMassKg = (secDef.mass * bo.length) / 1000;
+
+              return (
+                <>
+                  <div className="kpi-grid" style={{ marginBottom: 8 }}>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Unit Mass</div>
+                      <div className="kpi-value-sm">{secDef.mass} kg/m</div>
+                    </div>
+                    <div className="kpi-card">
+                      <div className="kpi-label">Total Mass</div>
+                      <div className="kpi-value-sm">{totalMassKg.toFixed(1)} kg</div>
+                    </div>
+                  </div>
+
+                  <div className="info-row" style={{ marginBottom: 8 }}>
+                    <span>Profile (D × B):</span>
+                    <span className="info-val">{secDef.depth} × {secDef.flangeWidth} mm</span>
+                  </div>
+
+                  <div className="field">
+                    <span className="field-label">Section Profile</span>
+                    <select
+                      className="field-select"
+                      style={{ maxWidth: 160 }}
+                      value={bo.sectionName}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as SteelBeamObject).sectionName = e.target.value;
+                        })
+                      }
+                    >
+                      <optgroup label="Universal Beams (UB)">
+                        {Object.values(STEEL_CATALOGUE)
+                          .filter((s) => s.category === 'UB')
+                          .map((s) => (
+                            <option key={s.name} value={s.name}>
+                              {s.label} ({s.mass} kg/m)
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Universal Columns (UC)">
+                        {Object.values(STEEL_CATALOGUE)
+                          .filter((s) => s.category === 'UC')
+                          .map((s) => (
+                            <option key={s.name} value={s.name}>
+                              {s.label} ({s.mass} kg/m)
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Parallel Flange Channels (PFC)">
+                        {Object.values(STEEL_CATALOGUE)
+                          .filter((s) => s.category === 'PFC')
+                          .map((s) => (
+                            <option key={s.name} value={s.name}>
+                              {s.label} ({s.mass} kg/m)
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Square Hollow Sections (SHS)">
+                        {Object.values(STEEL_CATALOGUE)
+                          .filter((s) => s.category === 'SHS')
+                          .map((s) => (
+                            <option key={s.name} value={s.name}>
+                              {s.label} ({s.mass} kg/m)
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Rectangular Hollow Sections (RHS)">
+                        {Object.values(STEEL_CATALOGUE)
+                          .filter((s) => s.category === 'RHS')
+                          .map((s) => (
+                            <option key={s.name} value={s.name}>
+                              {s.label} ({s.mass} kg/m)
+                            </option>
+                          ))}
+                      </optgroup>
+                      <optgroup label="Equal Angles (EA)">
+                        {Object.values(STEEL_CATALOGUE)
+                          .filter((s) => s.category === 'EA')
+                          .map((s) => (
+                            <option key={s.name} value={s.name}>
+                              {s.label} ({s.mass} kg/m)
+                            </option>
+                          ))}
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <NumberField
+                    label="Length"
+                    value={bo.length}
+                    min={10}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as SteelBeamObject).length = v;
+                      })
+                    }
+                  />
+
+                  <div className="field">
+                    <span className="field-label">Alignment</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 6px',
+                          background: bo.alignment === 'topCenter' ? '#facc15' : undefined,
+                          color: bo.alignment === 'topCenter' ? '#000' : undefined,
+                          fontWeight: bo.alignment === 'topCenter' ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as SteelBeamObject).alignment = 'topCenter';
+                          })
+                        }
+                        title="Top of Steel (TOS)"
+                      >
+                        TOS (Top)
+                      </button>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 6px',
+                          background: bo.alignment === 'center' ? '#facc15' : undefined,
+                          color: bo.alignment === 'center' ? '#000' : undefined,
+                          fontWeight: bo.alignment === 'center' ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as SteelBeamObject).alignment = 'center';
+                          })
+                        }
+                        title="Centerline"
+                      >
+                        Center
+                      </button>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 6px',
+                          background: bo.alignment === 'bottomCenter' ? '#facc15' : undefined,
+                          color: bo.alignment === 'bottomCenter' ? '#000' : undefined,
+                          fontWeight: bo.alignment === 'bottomCenter' ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as SteelBeamObject).alignment = 'bottomCenter';
+                          })
+                        }
+                        title="Bottom of Steel (BOS)"
+                      >
+                        BOS (Bot)
+                      </button>
+                    </div>
+                  </div>
+
+                  <NumberField
+                    label="Roll Angle"
+                    suffix="°"
+                    value={bo.rollAngle ?? 0}
+                    onCommit={(v) =>
+                      updateObject(obj.id, (o) => {
+                        (o as SteelBeamObject).rollAngle = v;
+                      })
+                    }
+                  />
+
+                  <div className="field">
+                    <span className="field-label">Roll Presets</span>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 6px',
+                          background: (bo.rollAngle ?? 0) === 0 ? '#facc15' : undefined,
+                          color: (bo.rollAngle ?? 0) === 0 ? '#000' : undefined,
+                          fontWeight: (bo.rollAngle ?? 0) === 0 ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as SteelBeamObject).rollAngle = 0;
+                          })
+                        }
+                      >
+                        0° (Vertical)
+                      </button>
+                      <button
+                        type="button"
+                        className="mini-add-btn"
+                        style={{
+                          padding: '3px 6px',
+                          background: (bo.rollAngle ?? 0) === 90 ? '#facc15' : undefined,
+                          color: (bo.rollAngle ?? 0) === 90 ? '#000' : undefined,
+                          fontWeight: (bo.rollAngle ?? 0) === 90 ? 700 : 500,
+                        }}
+                        onClick={() =>
+                          updateObject(obj.id, (o) => {
+                            (o as SteelBeamObject).rollAngle = 90;
+                          })
+                        }
+                      >
+                        90° (Flat)
+                      </button>
+                    </div>
+                  </div>
                 </>
               );
             })()}

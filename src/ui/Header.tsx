@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { useApp } from '../core/store';
 import { Icon } from './Icon';
 import {

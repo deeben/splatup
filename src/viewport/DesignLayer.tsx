@@ -13,10 +13,14 @@ import type {
   HandrailObject,
   LadderObject,
   PolyShapeObject,
+  StairsObject,
+  SteelBeamObject,
   SwingGateObject,
 } from '../core/types';
 import { buildPolyPrismGeometry } from './geometry/polyPrism';
 import { buildAccessLadder, buildMonowillsHandrail, buildSwingGate } from './geometry/monowills';
+import { buildStairsGeometry } from './geometry/stairs';
+import { buildSteelBeamGeometry } from './geometry/steelSections';
 
 export function DesignLayer() {
   const objects = useApp((s) => s.doc.objects);
@@ -182,6 +186,28 @@ function shapeFor(obj: DesignObject) {
       offsetY: 0,
       snapPoints: res.snapPoints,
       showEdges: false,
+    };
+  }
+
+  if (obj.kind === 'stairs') {
+    const o = obj as StairsObject;
+    const res = buildStairsGeometry(o);
+    return {
+      geometry: res.geometry,
+      offsetY: 0,
+      snapPoints: res.snapPoints,
+      showEdges: false,
+    };
+  }
+
+  if (obj.kind === 'beam') {
+    const o = obj as SteelBeamObject;
+    const res = buildSteelBeamGeometry(o);
+    return {
+      geometry: res.geometry,
+      offsetY: 0,
+      snapPoints: res.snapPoints,
+      showEdges: true,
     };
   }
 

@@ -101,13 +101,49 @@ export interface LadderObject extends BaseObject {
   cageStartHeight: number;
 }
 
+/** AS 1657 Industrial Stairway with PFC stringers, grating treads, and Monowills handrails. */
+export interface StairsObject extends BaseObject {
+  kind: 'stairs';
+  /** Clear width between stringers in mm (standard 750mm, range 600-1200mm). */
+  width: number;
+  /** Total vertical rise in mm (floor-to-floor). */
+  totalRise: number;
+  /** Horizontal tread going in mm (standard 245mm, range 235-245mm). */
+  going: number;
+  /** Number of step risers (auto-calculated from ~190mm rise). */
+  numSteps: number;
+  /** Stringer channel profile (per D-001-S-10013): 200PFC, 250PFC, or 150PFC. */
+  stringerSection: '200PFC' | '250PFC' | '150PFC';
+  /** Handrail placement: 'both' | 'left' | 'right' | 'none'. */
+  handrailSide: 'both' | 'left' | 'right' | 'none';
+  /** Handrail height above nosing line in mm (900 or 1000). */
+  handrailHeight: 900 | 1000;
+  /** Include 100mm kickplate / toeboard on stringers. */
+  hasKickplate: boolean;
+}
+
+/** Australian Standard Structural Steel Section (UB, UC, PFC, SHS/RHS, EA). */
+export interface SteelBeamObject extends BaseObject {
+  kind: 'beam';
+  /** Section designation, e.g. '250UB37', '200PFC', '150UC30', '100x100 SHS'. */
+  sectionName: string;
+  /** Beam length in mm along local X. */
+  length: number;
+  /** Alignment cardinal point relative to section: 'topCenter' | 'center' | 'bottomCenter'. */
+  alignment: 'topCenter' | 'center' | 'bottomCenter';
+  /** Axial roll rotation in degrees (0 = strong axis vertical). */
+  rollAngle: number;
+}
+
 export type DesignObject =
   | BoxObject
   | CylinderObject
   | PolyShapeObject
   | HandrailObject
   | SwingGateObject
-  | LadderObject;
+  | LadderObject
+  | StairsObject
+  | SteelBeamObject;
 export type DesignKind = DesignObject['kind'];
 
 export interface Measurement {
@@ -161,7 +197,9 @@ export type Tool =
   | 'polyShape'
   | 'handrail'
   | 'gate'
-  | 'ladder';
+  | 'ladder'
+  | 'stairs'
+  | 'beam';
 
 export type SnapKind = 'vertex' | 'corner' | 'face' | 'axis';
 

@@ -27,6 +27,10 @@ const paths: Record<string, string> = {
   gate: 'M3 5v14M7 6h10v12H7zM7 11h10M17 11v2M21 5v14',
   ladder: 'M7 2v20M17 2v20M7 6h10M7 10h10M7 14h10M7 18h10',
   align: 'M12 2l4 8-4-2-4 2 4-8zM12 22l-4-8 4 2 4-2-4 8z',
+  stairs: 'M3 20h4v-4h4v-4h4v-4h5',
+  beam: 'M5 5h14M12 5v14M5 19h14M7 5v2M17 5v2M7 17v2M17 17v2',
+  check: 'M20 6L9 17l-5-5',
+  warning: 'M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
 };
 
 export function Icon({ name, size = 18 }: { name: keyof typeof paths | string; size?: number }) {

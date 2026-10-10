@@ -142,6 +142,28 @@ const DEFAULTS: Record<DesignKind, () => Omit<DesignObject, 'id' | 'name' | 'tra
     color: '#94a3b8',
     visible: true,
   }),
+  stairs: () => ({
+    kind: 'stairs',
+    width: 750,
+    totalRise: 1900,
+    going: 245,
+    numSteps: 10,
+    stringerSection: '200PFC' as const,
+    handrailSide: 'both' as const,
+    handrailHeight: 1000 as const,
+    hasKickplate: true,
+    color: '#f59e0b',
+    visible: true,
+  }),
+  beam: () => ({
+    kind: 'beam',
+    sectionName: '250UB37',
+    length: 3000,
+    alignment: 'topCenter' as const,
+    rollAngle: 0,
+    color: '#64748b',
+    visible: true,
+  }),
 };
 
 const LABEL: Record<DesignKind, string> = {
@@ -151,6 +173,8 @@ const LABEL: Record<DesignKind, string> = {
   handrail: 'Monowills Handrail',
   gate: 'Swing Gate',
   ladder: 'Access Ladder',
+  stairs: 'Industrial Stairs',
+  beam: 'Steel Beam',
 };
 
 export const useApp = create<AppState>()((set, get) => ({
