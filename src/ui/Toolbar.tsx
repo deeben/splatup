@@ -23,6 +23,7 @@ export function Toolbar() {
   const tools: { id: Tool; label: string; icon: string; shortcut: string }[] = [
     { id: 'select', label: 'Select', icon: 'select', shortcut: 'V' },
     { id: 'measure', label: 'Measure (Snap)', icon: 'measure', shortcut: 'M' },
+    { id: 'align', label: 'Align Scene to Edge (2 Points)', icon: 'align', shortcut: 'A' },
     { id: 'box', label: 'Add Box / Duct Block', icon: 'box', shortcut: 'B' },
     { id: 'cylinder', label: 'Add Cylinder / Pipe', icon: 'cylinder', shortcut: 'C' },
     { id: 'polyShape', label: 'Custom Shape / Platform (Points)', icon: 'polyShape', shortcut: 'P' },

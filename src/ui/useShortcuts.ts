@@ -66,6 +66,9 @@ export function useShortcuts() {
         case 'm':
           setTool('measure');
           break;
+        case 'a':
+          setTool('align');
+          break;
         case 'b':
           setTool('box');
           break;

@@ -26,6 +26,7 @@ const paths: Record<string, string> = {
   handrail: 'M3 7h18M3 13h18M3 19h18M5 7v12M12 7v12M19 7v12',
   gate: 'M3 5v14M7 6h10v12H7zM7 11h10M17 11v2M21 5v14',
   ladder: 'M7 2v20M17 2v20M7 6h10M7 10h10M7 14h10M7 18h10',
+  align: 'M12 2l4 8-4-2-4 2 4-8zM12 22l-4-8 4 2 4-2-4 8z',
 };
 
 export function Icon({ name, size = 18 }: { name: keyof typeof paths | string; size?: number }) {

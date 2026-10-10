@@ -12,6 +12,9 @@ export function Viewport() {
   const showGrid = useApp((s) => s.showGrid);
   const floorZ = useApp((s) => s.bounds?.min[2] ?? 0);
 
+  const sceneAlignment = useApp((s) => s.doc.sceneAlignment ?? 0);
+  const alignRad = (sceneAlignment * Math.PI) / 180;
+
   return (
     <Canvas
       className={`viewport tool-${tool}`}
@@ -32,17 +35,18 @@ export function Viewport() {
       <MeasureLayer />
 
       {showGrid && (
-        <Grid
-          position={[0, floorZ / 1000 - 0.002, 0]}
-          infiniteGrid
-          cellSize={0.1}
-          sectionSize={1}
-          cellColor="#2b3340"
-          sectionColor="#3d4a5c"
-          fadeDistance={40}
-          fadeStrength={1.5}
-          userData={{ noPick: true }}
-        />
+        <group rotation={[0, alignRad, 0]} position={[0, floorZ / 1000 - 0.002, 0]}>
+          <Grid
+            infiniteGrid
+            cellSize={0.1}
+            sectionSize={1}
+            cellColor="#2b3340"
+            sectionColor="#3d4a5c"
+            fadeDistance={40}
+            fadeStrength={1.5}
+            userData={{ noPick: true }}
+          />
+        </group>
       )}
 
       <OrbitControls

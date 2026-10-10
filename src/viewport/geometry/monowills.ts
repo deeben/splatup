@@ -106,6 +106,9 @@ export function buildMonowillsHandrail(obj: HandrailObject): {
     const stanchionMaxSpacing = mm(obj.stanchionSpacing);
     const numStanchions = Math.max(2, Math.ceil(segLen / stanchionMaxSpacing) + 1);
 
+    const segAngle = Math.atan2(segDir.x, segDir.z);
+    const postRot = new Quaternion().setFromAxisAngle(_up, segAngle + Math.PI / 2);
+
     // Place stanchions along this segment
     for (let i = 0; i < numStanchions; i++) {
       // Avoid duplicate stanchion on intermediate corner joints
@@ -114,10 +117,10 @@ export function buildMonowillsHandrail(obj: HandrailObject): {
       const t = i / (numStanchions - 1);
       const postPos = new Vector3().lerpVectors(p1, p2, t);
 
-      // Base plate
+      // Base plate: oriented squarely with the handrail run
       const mBase = new Matrix4().compose(
         new Vector3(postPos.x, postPos.y + baseThick / 2, postPos.z),
-        _q.identity(),
+        postRot,
         _s,
       );
       items.push({ geom: baseGeom, matrix: mBase });

@@ -142,6 +142,8 @@ export interface Project {
   objects: DesignObject[];
   measurements: Measurement[];
   view: ViewSettings;
+  /** Scene orientation / alignment angle in degrees (yaw about user Z). Default 0. */
+  sceneAlignment?: number;
 }
 
 export type Selection =
@@ -153,6 +155,7 @@ export type Selection =
 export type Tool =
   | 'select'
   | 'measure'
+  | 'align'
   | 'box'
   | 'cylinder'
   | 'polyShape'
@@ -185,5 +188,6 @@ export function newProject(): Project {
     objects: [],
     measurements: [],
     view: { clipHeight: null },
+    sceneAlignment: 0,
   };
 }

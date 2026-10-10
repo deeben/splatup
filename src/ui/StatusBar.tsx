@@ -7,11 +7,18 @@ export function StatusBar() {
   const tool = useApp((s) => s.tool);
   const pendingA = useApp((s) => s.pendingA);
 
+  const sceneAlignment = useApp((s) => s.doc.sceneAlignment ?? 0);
+  const setTool = useApp((s) => s.setTool);
+
   const defaultHint =
     tool === 'measure'
       ? pendingA
         ? 'Click 2nd point to finish · Hold Shift to lock axis · Esc to cancel'
         : 'Click 1st point on scan or block · Esc to cancel'
+      : tool === 'align'
+        ? pendingA
+          ? 'Click 2nd point along wall or edge to set scene alignment · Esc to cancel'
+          : 'Click 1st point along a wall or beam in scan to align scene · Esc to cancel'
       : tool === 'polyShape'
         ? 'Click corners to draw platform/duct polygon · Click 1st point or Enter to close · Esc to cancel'
         : tool === 'handrail'
@@ -50,6 +57,20 @@ export function StatusBar() {
         )}
 
         <div className="status-units">
+          <button
+            type="button"
+            className="unit-badge"
+            style={{
+              cursor: 'pointer',
+              background: sceneAlignment !== 0 ? 'rgba(14, 165, 233, 0.25)' : undefined,
+              color: sceneAlignment !== 0 ? '#38bdf8' : undefined,
+              border: sceneAlignment !== 0 ? '1px solid rgba(14, 165, 233, 0.4)' : undefined,
+            }}
+            onClick={() => setTool('align')}
+            title="Scene Alignment (A) — Click to square scene to an edge"
+          >
+            🧭 Align {sceneAlignment.toFixed(1)}°
+          </button>
           <span className="unit-badge">mm</span>
           <span className="unit-badge">Z-Up</span>
         </div>

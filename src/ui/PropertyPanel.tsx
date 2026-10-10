@@ -35,6 +35,9 @@ export function PropertyPanel() {
   const removeScan = useApp((s) => s.removeScan);
   const gizmoSpace = useApp((s) => s.gizmoSpace);
   const setGizmoSpace = useApp((s) => s.setGizmoSpace);
+  const setTool = useApp((s) => s.setTool);
+  const setSceneAlignment = useApp((s) => s.setSceneAlignment);
+  const sceneAlignment = doc.sceneAlignment ?? 0;
 
   if (selection?.type === 'object') {
     const obj = doc.objects.find((o) => o.id === selection.id);
@@ -489,7 +492,23 @@ export function PropertyPanel() {
 
           {/* Rotation Section */}
           <div className="section-group">
-            <div className="section-title">Rotation (deg)</div>
+            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Rotation (deg)</span>
+              {sceneAlignment !== obj.transform.rotation[2] && (
+                <button
+                  type="button"
+                  className="mini-add-btn"
+                  onClick={() =>
+                    updateObject(obj.id, (o) => {
+                      o.transform.rotation[2] = sceneAlignment;
+                    })
+                  }
+                  title={`Align this object's yaw rotation to the scene orientation (${sceneAlignment}°)`}
+                >
+                  Square to Scene ({sceneAlignment}°)
+                </button>
+              )}
+            </div>
             <NumberField
               label="Yaw (Z)"
               suffix="°"
@@ -739,6 +758,68 @@ export function PropertyPanel() {
       </div>
 
       <div className="panel-body">
+        {/* Scene Alignment / Site Orientation */}
+        <div className="section-group">
+          <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Scene Alignment</span>
+            <button
+              type="button"
+              className="mini-add-btn"
+              onClick={() => setTool('align')}
+              title="Align scene by clicking two points along a wall or edge (A)"
+            >
+              Align to 2 Points...
+            </button>
+          </div>
+          <div className="subtext" style={{ marginBottom: 8 }}>
+            Rotates the CAD grid and squares all newly placed objects to the scan.
+          </div>
+          <NumberField
+            label="Orientation"
+            suffix="°"
+            value={sceneAlignment}
+            onCommit={(v) => setSceneAlignment(v)}
+          />
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{ flex: 1 }}
+              onClick={() => setSceneAlignment(0)}
+              title="Reset scene alignment to 0°"
+            >
+              0° (Reset)
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{ flex: 1 }}
+              onClick={() => setSceneAlignment((sceneAlignment + 45) % 360)}
+              title="Rotate +45°"
+            >
+              +45°
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{ flex: 1 }}
+              onClick={() => setSceneAlignment((sceneAlignment + 90) % 360)}
+              title="Rotate +90°"
+            >
+              +90°
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{ flex: 1 }}
+              onClick={() => setSceneAlignment((sceneAlignment - 45 + 360) % 360)}
+              title="Rotate -45°"
+            >
+              -45°
+            </button>
+          </div>
+        </div>
+
         {/* Section Cut / Height Clip */}
         <div className="section-group">
           <div className="section-title">Section Plane / Cut-away</div>

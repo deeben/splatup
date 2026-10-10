@@ -26,6 +26,8 @@ export function MeasureLayer() {
       ))}
       {pendingA && hover && tool === 'measure' && <PreviewLine a={pendingA} hover={hover} />}
       {pendingA && tool === 'measure' && <Endpoint p={pendingA} color="#facc15" />}
+      {pendingA && hover && tool === 'align' && <AlignPreview a={pendingA} hover={hover} />}
+      {pendingA && tool === 'align' && <Endpoint p={pendingA} color="#38bdf8" />}
       {(tool === 'polyShape' || tool === 'handrail') && drawingPoints.length > 0 && (
         <DrawingPreview points={drawingPoints} hover={hover} tool={tool} />
       )}
@@ -134,6 +136,26 @@ function PreviewLine({ a, hover }: { a: Vec3; hover: SnapResult }) {
       <Line points={[wa, wb]} color={color} lineWidth={2} dashed dashSize={0.03} gapSize={0.02} depthTest={false} renderOrder={10} />
       <Html position={mid} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
         <div className="dim-label preview">{fmtMm(p.total)}</div>
+      </Html>
+    </>
+  );
+}
+
+function AlignPreview({ a, hover }: { a: Vec3; hover: SnapResult }) {
+  const wa = userToWorldTuple(a);
+  const wb = userToWorldTuple(hover.point);
+  const mid: [number, number, number] = [(wa[0] + wb[0]) / 2, (wa[1] + wb[1]) / 2, (wa[2] + wb[2]) / 2];
+  const dx = hover.point[0] - a[0];
+  const dy = hover.point[1] - a[1];
+  const yawRad = Math.atan2(dy, dx);
+  const yawDeg = Math.round(((yawRad * 180) / Math.PI) * 10) / 10;
+  return (
+    <>
+      <Line points={[wa, wb]} color="#38bdf8" lineWidth={2} dashed dashSize={0.03} gapSize={0.02} depthTest={false} renderOrder={10} />
+      <Html position={mid} center zIndexRange={[20, 10]} style={{ pointerEvents: 'none' }}>
+        <div className="dim-label preview" style={{ background: 'rgba(14, 165, 233, 0.95)', color: '#fff', borderColor: '#38bdf8', fontWeight: 600 }}>
+          Align: {yawDeg}°
+        </div>
       </Html>
     </>
   );

@@ -87,6 +87,9 @@ interface AppState {
   addPolyShape: (points: Vec3[], thickness?: number) => string;
   addHandrail: (points: Vec3[], height?: 900 | 1000) => string;
 
+  /** Set project/scene orientation angle in degrees. */
+  setSceneAlignment: (angle: number) => void;
+
   loadProject: (doc: Project, files: Record<string, Blob>) => void;
   resetProject: () => void;
 }
@@ -228,11 +231,12 @@ export const useApp = create<AppState>()((set, get) => ({
   addObject: (kind, at) => {
     const id = uid('obj_');
     const count = get().doc.objects.filter((o) => o.kind === kind).length + 1;
+    const align = get().doc.sceneAlignment ?? 0;
     const obj = {
       ...DEFAULTS[kind](),
       id,
       name: `${LABEL[kind]} ${count}`,
-      transform: { position: at, rotation: [0, 0, 0] as Vec3 },
+      transform: { position: at, rotation: [0, 0, Math.round(align * 10) / 10] as Vec3 },
     } as DesignObject;
     get().commit((d) => {
       d.objects.push(obj);
@@ -297,21 +301,31 @@ export const useApp = create<AppState>()((set, get) => ({
     if (points.length < 3) return '';
     const id = uid('obj_');
     const count = get().doc.objects.filter((o) => o.kind === 'polyShape').length + 1;
+    const align = get().doc.sceneAlignment ?? 0;
+    const alignRad = (align * Math.PI) / 180;
+    const cosA = Math.cos(alignRad);
+    const sinA = Math.sin(alignRad);
     const n = points.length;
     const cx = points.reduce((s, p) => s + p[0], 0) / n;
     const cy = points.reduce((s, p) => s + p[1], 0) / n;
     const cz = points.reduce((s, p) => s + p[2], 0) / n;
     const center: Vec3 = [Math.round(cx), Math.round(cy), Math.round(cz)];
-    const localPoints: Vec3[] = points.map((p) => [
-      Math.round(p[0] - center[0]),
-      Math.round(p[1] - center[1]),
-      Math.round(p[2] - center[2]),
-    ]);
+    // Rotate into local space aligned with scene alignment
+    const localPoints: Vec3[] = points.map((p) => {
+      const dx = p[0] - center[0];
+      const dy = p[1] - center[1];
+      const dz = p[2] - center[2];
+      return [
+        Math.round(dx * cosA + dy * sinA),
+        Math.round(-dx * sinA + dy * cosA),
+        Math.round(dz),
+      ];
+    });
     const obj: PolyShapeObject = {
       kind: 'polyShape',
       id,
       name: `Platform / Slab ${count}`,
-      transform: { position: center, rotation: [0, 0, 0] },
+      transform: { position: center, rotation: [0, 0, Math.round(align * 10) / 10] },
       points: localPoints,
       thickness,
       color: '#10b981',
@@ -329,16 +343,28 @@ export const useApp = create<AppState>()((set, get) => ({
     const id = uid('obj_');
     const count = get().doc.objects.filter((o) => o.kind === 'handrail').length + 1;
     const origin = points[0].map((v) => Math.round(v)) as Vec3;
-    const localPoints: Vec3[] = points.map((p) => [
-      Math.round(p[0] - origin[0]),
-      Math.round(p[1] - origin[1]),
-      Math.round(p[2] - origin[2]),
-    ]);
+    const dx = points[1][0] - points[0][0];
+    const dy = points[1][1] - points[0][1];
+    const yawRad = Math.atan2(dy, dx);
+    const yawDeg = Math.round(((yawRad * 180) / Math.PI) * 10) / 10;
+    const cosY = Math.cos(yawRad);
+    const sinY = Math.sin(yawRad);
+    // Rotate into local coordinate space aligned with the handrail run
+    const localPoints: Vec3[] = points.map((p) => {
+      const vx = p[0] - origin[0];
+      const vy = p[1] - origin[1];
+      const vz = p[2] - origin[2];
+      return [
+        Math.round(vx * cosY + vy * sinY),
+        Math.round(-vx * sinY + vy * cosY),
+        Math.round(vz),
+      ];
+    });
     const obj: HandrailObject = {
       kind: 'handrail',
       id,
       name: `Monowills Run ${count}`,
-      transform: { position: origin, rotation: [0, 0, 0] },
+      transform: { position: origin, rotation: [0, 0, yawDeg] },
       points: localPoints,
       height,
       stanchionSpacing: 1500,
@@ -353,6 +379,13 @@ export const useApp = create<AppState>()((set, get) => ({
     });
     set({ selection: { type: 'object', id }, drawingPoints: [], tool: 'select' });
     return id;
+  },
+
+  setSceneAlignment: (angle) => {
+    const clean = Math.round(angle * 10) / 10;
+    get().commit((d) => {
+      d.sceneAlignment = clean;
+    });
   },
 
   setTool: (tool) => set({ tool, pendingA: null, drawingPoints: [], status: '' }),

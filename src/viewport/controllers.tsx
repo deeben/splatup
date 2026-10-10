@@ -96,6 +96,28 @@ export function ToolController() {
           }
           break;
         }
+        case 'align': {
+          const s = snapAt(e);
+          if (!s) return;
+          if (!st.pendingA) {
+            st.setPendingA(s.point);
+            st.setStatus('Click second point along the wall or edge to set scene alignment · Esc to cancel');
+          } else {
+            const dx = s.point[0] - st.pendingA[0];
+            const dy = s.point[1] - st.pendingA[1];
+            if (Math.hypot(dx, dy) > 20) {
+              const yawRad = Math.atan2(dy, dx);
+              const yawDeg = Math.round(((yawRad * 180) / Math.PI) * 10) / 10;
+              st.setSceneAlignment(yawDeg);
+              st.setPendingA(null);
+              st.setTool('select');
+              st.setStatus(`✓ Scene aligned to ${yawDeg}°. Grid and new objects are now square.`);
+            } else {
+              st.setStatus('Points are too close together — click another point along the edge');
+            }
+          }
+          break;
+        }
         case 'polyShape': {
           const s = snapAt(e);
           if (!s) return;
