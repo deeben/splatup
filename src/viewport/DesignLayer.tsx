@@ -109,6 +109,7 @@ function shapeFor(obj: DesignObject) {
 function Gizmo({ id }: { id: string }) {
   const scene = useThree((s) => s.scene);
   const mode = useApp((s) => s.gizmoMode);
+  const space = useApp((s) => s.gizmoSpace);
   const gridSnap = useApp((s) => s.gridSnap);
   const tool = useApp((s) => s.tool);
   const objects = useApp((s) => s.doc.objects);
@@ -143,7 +144,7 @@ function Gizmo({ id }: { id: string }) {
       ref={ref}
       object={target}
       mode={mode}
-      space={mode === 'rotate' ? 'local' : 'world'}
+      space={space}
       translationSnap={gridSnap ? 0.01 : null}
       rotationSnap={gridSnap ? Math.PI / 12 : null}
       size={0.8}

@@ -5,6 +5,7 @@ export function useShortcuts() {
   const tool = useApp((s) => s.tool);
   const setTool = useApp((s) => s.setTool);
   const setGizmoMode = useApp((s) => s.setGizmoMode);
+  const toggleGizmoSpace = useApp((s) => s.toggleGizmoSpace);
   const gridSnap = useApp((s) => s.gridSnap);
   const setGridSnap = useApp((s) => s.setGridSnap);
   const undo = useApp((s) => s.undo);
@@ -72,6 +73,9 @@ export function useShortcuts() {
         case 'e':
           setGizmoMode('rotate');
           break;
+        case 'q':
+          toggleGizmoSpace();
+          break;
         case 'g':
           setGridSnap(!gridSnap);
           break;
@@ -101,6 +105,7 @@ export function useShortcuts() {
     tool,
     setTool,
     setGizmoMode,
+    toggleGizmoSpace,
     gridSnap,
     setGridSnap,
     undo,

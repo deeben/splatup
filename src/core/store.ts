@@ -18,6 +18,7 @@ import { uid } from './units';
 const HISTORY_LIMIT = 200;
 
 export type GizmoMode = 'translate' | 'rotate';
+export type GizmoSpace = 'local' | 'world';
 
 interface AppState {
   doc: Project;
@@ -30,6 +31,7 @@ interface AppState {
   tool: Tool;
   selection: Selection;
   gizmoMode: GizmoMode;
+  gizmoSpace: GizmoSpace;
   /** Snap gizmo translation to 10 mm / rotation to 15°. */
   gridSnap: boolean;
   hover: SnapResult | null;
@@ -61,6 +63,8 @@ interface AppState {
   setTool: (t: Tool) => void;
   select: (s: Selection) => void;
   setGizmoMode: (m: GizmoMode) => void;
+  setGizmoSpace: (s: GizmoSpace) => void;
+  toggleGizmoSpace: () => void;
   setGridSnap: (v: boolean) => void;
   setHover: (h: SnapResult | null) => void;
   setPendingA: (p: Vec3 | null) => void;
@@ -93,6 +97,7 @@ export const useApp = create<AppState>()((set, get) => ({
   tool: 'select',
   selection: null,
   gizmoMode: 'translate',
+  gizmoSpace: 'local',
   gridSnap: true,
   hover: null,
   pendingA: null,
@@ -224,6 +229,8 @@ export const useApp = create<AppState>()((set, get) => ({
   setTool: (tool) => set({ tool, pendingA: null, status: '' }),
   select: (selection) => set({ selection }),
   setGizmoMode: (gizmoMode) => set({ gizmoMode }),
+  setGizmoSpace: (gizmoSpace) => set({ gizmoSpace }),
+  toggleGizmoSpace: () => set((s) => ({ gizmoSpace: s.gizmoSpace === 'local' ? 'world' : 'local' })),
   setGridSnap: (gridSnap) => set({ gridSnap }),
   setHover: (hover) => set({ hover }),
   setPendingA: (pendingA) => set({ pendingA }),

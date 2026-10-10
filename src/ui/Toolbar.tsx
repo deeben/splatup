@@ -7,6 +7,8 @@ export function Toolbar() {
   const setTool = useApp((s) => s.setTool);
   const gizmoMode = useApp((s) => s.gizmoMode);
   const setGizmoMode = useApp((s) => s.setGizmoMode);
+  const gizmoSpace = useApp((s) => s.gizmoSpace);
+  const toggleGizmoSpace = useApp((s) => s.toggleGizmoSpace);
   const gridSnap = useApp((s) => s.gridSnap);
   const setGridSnap = useApp((s) => s.setGridSnap);
   const showGrid = useApp((s) => s.showGrid);
@@ -65,6 +67,18 @@ export function Toolbar() {
         >
           <Icon name="rotate" />
           <span className="tool-badge">E</span>
+        </button>
+        <button
+          type="button"
+          className={`tool-btn ${gizmoSpace === 'local' ? 'active' : ''}`}
+          onClick={toggleGizmoSpace}
+          title={`Gizmo Space: ${gizmoSpace === 'local' ? 'Object Space (Aligned to Box)' : 'World Space'} (Q)`}
+          disabled={selection?.type !== 'object'}
+        >
+          <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: -0.2 }}>
+            {gizmoSpace === 'local' ? 'OBJ' : 'WLD'}
+          </span>
+          <span className="tool-badge">Q</span>
         </button>
         <button
           type="button"

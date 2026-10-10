@@ -25,6 +25,8 @@ export function PropertyPanel() {
   const renameMeasurement = useApp((s) => s.renameMeasurement);
   const commit = useApp((s) => s.commit);
   const removeScan = useApp((s) => s.removeScan);
+  const gizmoSpace = useApp((s) => s.gizmoSpace);
+  const setGizmoSpace = useApp((s) => s.setGizmoSpace);
 
   if (selection?.type === 'object') {
     const obj = doc.objects.find((o) => o.id === selection.id);
@@ -135,7 +137,17 @@ export function PropertyPanel() {
 
           {/* Position Section */}
           <div className="section-group">
-            <div className="section-title">Position (mm)</div>
+            <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Position (mm)</span>
+              <button
+                type="button"
+                className="mini-add-btn"
+                onClick={() => setGizmoSpace(gizmoSpace === 'local' ? 'world' : 'local')}
+                title="Toggle Gizmo alignment between Object (local) and World space (Q)"
+              >
+                {gizmoSpace === 'local' ? 'Object Space' : 'World Space'}
+              </button>
+            </div>
             <NumberField
               label="X"
               value={obj.transform.position[0]}
