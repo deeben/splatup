@@ -17,7 +17,6 @@ export function Header() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
-  const [loadingSample, setLoadingSample] = useState(false);
 
   const handleScanUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -38,23 +37,6 @@ export function Header() {
       setStatus(`Failed to open project: ${(err as Error).message}`);
     }
     e.target.value = '';
-  };
-
-  const handleLoadSample = async () => {
-    setLoadingSample(true);
-    setStatus('Fetching sample scan 851.glb…');
-    try {
-      const res = await fetch('/samples/851.glb');
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const blob = await res.blob();
-      addScan(blob, '851.glb');
-      setStatus('Sample scan 851.glb loaded successfully');
-    } catch (err) {
-      console.error(err);
-      setStatus(`Could not load sample scan: ${(err as Error).message}`);
-    } finally {
-      setLoadingSample(false);
-    }
   };
 
   const handleNewProject = async () => {
@@ -105,17 +87,6 @@ export function Header() {
           style={{ display: 'none' }}
           onChange={handleProjectOpen}
         />
-
-        <button
-          type="button"
-          className="header-btn secondary"
-          onClick={handleLoadSample}
-          disabled={loadingSample}
-          title="Load included 851.glb sample scan"
-        >
-          <Icon name="scan" size={16} />
-          <span>{loadingSample ? 'Loading…' : 'Sample 851'}</span>
-        </button>
 
         <button
           type="button"

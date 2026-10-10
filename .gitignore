@@ -9,3 +9,7 @@ dist
 /GLB
 /LAS
 /PLY
+*.glb
+/public/samples
+/samples
+/references

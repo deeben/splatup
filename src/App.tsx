@@ -18,7 +18,6 @@ export function App() {
   const objectsCount = useApp((s) => s.doc.objects.length);
   const addScan = useApp((s) => s.addScan);
   const setStatus = useApp((s) => s.setStatus);
-  const [loadingSample, setLoadingSample] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,23 +32,6 @@ export function App() {
     const unsub = startAutosave();
     return () => unsub();
   }, []);
-
-  const handleLoadSample = async () => {
-    setLoadingSample(true);
-    setStatus('Loading sample scan 851.glb…');
-    try {
-      const res = await fetch('/samples/851.glb');
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const blob = await res.blob();
-      addScan(blob, '851.glb');
-      setStatus('Sample scan 851.glb loaded successfully');
-    } catch (err) {
-      console.error(err);
-      setStatus(`Failed to load sample: ${(err as Error).message}`);
-    } finally {
-      setLoadingSample(false);
-    }
-  };
 
   const showWelcome = ready && scansCount === 0 && objectsCount === 0;
 
@@ -75,17 +57,7 @@ export function App() {
                 </p>
 
                 <div className="welcome-actions">
-                  <button
-                    type="button"
-                    className="welcome-btn primary"
-                    onClick={handleLoadSample}
-                    disabled={loadingSample}
-                  >
-                    <Icon name="scan" size={20} />
-                    <span>{loadingSample ? 'Loading 851.glb…' : 'Load Sample Scan (851.glb)'}</span>
-                  </button>
-
-                  <label className="welcome-btn secondary">
+                  <label className="welcome-btn primary">
                     <Icon name="import" size={20} />
                     <span>Import GLB Scan</span>
                     <input
