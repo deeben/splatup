@@ -1,11 +1,12 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Html, Line } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import type { Mesh } from 'three';
+import type { Group, Mesh } from 'three';
 import { useApp } from '../core/store';
 import { userToWorldTuple } from '../core/frame';
 import { fmtMm, measureParts } from '../core/units';
 import type { Measurement, SnapResult, Vec3 } from '../core/types';
+import { registry } from './registry';
 
 const AXIS_COLORS = ['#ef4444', '#22c55e', '#3b82f6'];
 
@@ -16,11 +17,19 @@ export function MeasureLayer() {
   const hover = useApp((s) => s.hover);
   const tool = useApp((s) => s.tool);
   const drawingPoints = useApp((s) => s.drawingPoints);
+  const groupRef = useRef<Group>(null);
+
+  useEffect(() => {
+    registry.measureRoot = groupRef.current;
+    return () => {
+      registry.measureRoot = null;
+    };
+  }, []);
 
   const selId = selection?.type === 'measurement' ? selection.id : null;
 
   return (
-    <group name="measurements">
+    <group ref={groupRef} name="measurements">
       {measurements.map((m) => (
         <MeasurementView key={m.id} m={m} selected={m.id === selId} />
       ))}

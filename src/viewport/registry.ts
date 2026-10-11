@@ -2,6 +2,17 @@ import type { Camera, Object3D, Scene, WebGLRenderer } from 'three';
 import type { OrbitControls as OrbitControlsImpl, TransformControls } from 'three-stdlib';
 import type { StandardView } from '../core/types';
 
+export interface ProjectedDimension {
+  id: string;
+  name: string;
+  distMm: number;
+  label: string;
+  // Normalized device coordinates [-1, 1]
+  ndcA: [number, number]; // [x, y]
+  ndcB: [number, number]; // [x, y]
+  ndcDist: number;
+}
+
 export interface CapturedView {
   id: StandardView;
   title: string;
@@ -10,6 +21,7 @@ export interface CapturedView {
   jpegBytes: Uint8Array;
   width: number;
   height: number;
+  projectedDimensions?: ProjectedDimension[];
 }
 
 /**
@@ -19,6 +31,7 @@ export interface CapturedView {
 export const registry: {
   scanRoot: Object3D | null;
   designRoot: Object3D | null;
+  measureRoot: Object3D | null;
   transformControls: TransformControls | null;
   camera: Camera | null;
   controls: OrbitControlsImpl | null;
@@ -30,6 +43,7 @@ export const registry: {
 } = {
   scanRoot: null,
   designRoot: null,
+  measureRoot: null,
   transformControls: null,
   camera: null,
   controls: null,

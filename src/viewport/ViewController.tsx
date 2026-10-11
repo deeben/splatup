@@ -3,7 +3,8 @@ import { useThree } from '@react-three/fiber';
 import { Box3, Color, PerspectiveCamera, Vector2, Vector3 } from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useApp } from '../core/store';
-import { registry, type CapturedView } from './registry';
+import { registry, type CapturedView, type ProjectedDimension } from './registry';
+import { userToWorld } from '../core/frame';
 import type { StandardView } from '../core/types';
 
 /**
@@ -157,6 +158,7 @@ export function ViewController() {
       // 1. Save previous state
       const prevScanVis = registry.scanRoot ? registry.scanRoot.visible : true;
       const prevGizmoVis = registry.transformControls ? registry.transformControls.visible : true;
+      const prevMeasureVis = registry.measureRoot ? registry.measureRoot.visible : true;
       const prevBg = rScene.background;
       const prevCamPos = rCam.position.clone();
       const prevCamUp = rCam.up.clone();
@@ -166,9 +168,11 @@ export function ViewController() {
       const prevCamNear = rCam.near;
       const prevCamFar = rCam.far;
 
-      // Hide scan data and transform gizmo, keep CAD primitives only
+      // Hide scan data, transform gizmo, and viewport measurement lines (rendered in PDF as solid black vector callouts)
+
       if (registry.scanRoot) registry.scanRoot.visible = false;
       if (registry.transformControls) registry.transformControls.visible = false;
+      if (registry.measureRoot) registry.measureRoot.visible = false;
       if (registry.designRoot) registry.designRoot.visible = true;
 
       // Set clean architectural white background
@@ -212,6 +216,8 @@ export function ViewController() {
       rCam.aspect = targetW / targetH;
       rCam.updateProjectionMatrix();
 
+      const docMeasurements = useApp.getState().doc.measurements;
+
       try {
         for (const v of viewsToCapture) {
           const { position, target, up } = computeViewCamera(v.id, frontAngle, center, distance);
@@ -226,6 +232,43 @@ export function ViewController() {
           const res = await fetch(dataUrl);
           const buf = await res.arrayBuffer();
 
+          // Calculate 2D projected dimensions for this elevation view
+          const projectedDimensions: ProjectedDimension[] = [];
+          for (const m of docMeasurements) {
+            const wa = userToWorld(m.a);
+            const wb = userToWorld(m.b);
+            const pA = wa.clone().project(rCam);
+            const pB = wb.clone().project(rCam);
+
+            // Skip if points are behind camera or beyond far plane
+            if (pA.z < -1 || pA.z > 1 || pB.z < -1 || pB.z > 1) continue;
+
+            const dx = m.b[0] - m.a[0];
+            const dy = m.b[1] - m.a[1];
+            const dz = m.b[2] - m.a[2];
+            const totalMm = Math.round(Math.hypot(dx, dy, dz));
+
+            const ndcDist = Math.hypot(pB.x - pA.x, pB.y - pA.y);
+            if (ndcDist < 0.02) continue; // Skip if viewed end-on (< ~10pt on paper)
+
+            let label = `${totalMm} mm`;
+            if (m.name && !m.name.match(/^M\d+$/i)) {
+              label = `${m.name}: ${totalMm} mm`;
+            } else if (m.name) {
+              label = `${m.name} · ${totalMm} mm`;
+            }
+
+            projectedDimensions.push({
+              id: m.id,
+              name: m.name,
+              distMm: totalMm,
+              label,
+              ndcA: [pA.x, pA.y],
+              ndcB: [pB.x, pB.y],
+              ndcDist,
+            });
+          }
+
           captured.push({
             id: v.id,
             title: v.title,
@@ -234,12 +277,14 @@ export function ViewController() {
             jpegBytes: new Uint8Array(buf),
             width: targetW,
             height: targetH,
+            projectedDimensions,
           });
         }
       } finally {
         // Restore all previous states
         if (registry.scanRoot) registry.scanRoot.visible = prevScanVis;
         if (registry.transformControls) registry.transformControls.visible = prevGizmoVis;
+        if (registry.measureRoot) registry.measureRoot.visible = prevMeasureVis;
         rScene.background = prevBg;
 
         rCam.fov = prevCamFov;
@@ -264,6 +309,7 @@ export function ViewController() {
       registry.controls = null;
       registry.gl = null;
       registry.scene = null;
+      registry.measureRoot = null;
       registry.setFrontFromCurrentCamera = undefined;
       registry.getCurrentCameraAzimuth = undefined;
       registry.captureElevationViews = undefined;

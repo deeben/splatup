@@ -287,6 +287,81 @@ export class PdfWriter {
   }
 
   /**
+   * Draws an AS 1100 engineering dimension line between (x1, y1Top) and (x2, y2Top)
+   * with 45° architectural slash ticks, endpoint anchor dots, and a centered white callout badge with solid black text.
+   */
+  drawDimension(
+    x1: number,
+    y1Top: number,
+    x2: number,
+    y2Top: number,
+    labelText: string,
+    options?: {
+      stroke?: ColorRgb;
+      lineWidth?: number;
+      textSize?: number;
+      textColor?: ColorRgb;
+    },
+  ): this {
+    const stroke = options?.stroke ?? PDF_COLORS.black;
+    const lineWidth = options?.lineWidth ?? 0.9;
+    const textSize = options?.textSize ?? 7.5;
+    const textColor = options?.textColor ?? PDF_COLORS.black;
+
+    const dx = x2 - x1;
+    const dy = y2Top - y1Top;
+    const len = Math.hypot(dx, dy);
+
+    if (len < 6) return this;
+
+    const ux = dx / len;
+    const uy = dy / len;
+    const nx = -uy;
+    const ny = ux;
+
+    // 1. Draw main dimension line in solid black
+    this.drawLine(x1, y1Top, x2, y2Top, { stroke, lineWidth });
+
+    // 2. 45° architectural slash ticks at endpoints
+    const tickLen = 4;
+    const tx = (ux + nx) * 0.707 * tickLen;
+    const ty = (uy + ny) * 0.707 * tickLen;
+
+    this.drawLine(x1 - tx, y1Top - ty, x1 + tx, y1Top + ty, { stroke, lineWidth: 1.1 });
+    this.drawLine(x2 - tx, y2Top - ty, x2 + tx, y2Top + ty, { stroke, lineWidth: 1.1 });
+
+    // Small endpoint anchor dots (radius 1.2pt)
+    this.drawRect(x1 - 1.2, y1Top - 1.2, 2.4, 2.4, { fill: stroke });
+    this.drawRect(x2 - 1.2, y2Top - 1.2, 2.4, 2.4, { fill: stroke });
+
+    // 3. Center callout badge with clean white mask
+    const mx = (x1 + x2) / 2;
+    const my = (y1Top + y2Top) / 2;
+
+    const clean = sanitizeText(labelText);
+    const textW = clean.length * textSize * 0.54;
+    const pillW = textW + 10;
+    const pillH = textSize + 6;
+
+    // White badge with subtle solid black border
+    this.drawRect(mx - pillW / 2, my - pillH / 2, pillW, pillH, {
+      fill: PDF_COLORS.white,
+      stroke,
+      lineWidth: 0.6,
+    });
+
+    // Solid black dimension text centered in badge
+    this.drawText(labelText, mx, my - textSize * 0.45, {
+      font: 'bold',
+      size: textSize,
+      color: textColor,
+      align: 'center',
+    });
+
+    return this;
+  }
+
+  /**
    * Assembles all objects into a valid, standard PDF-1.4 binary byte array.
    */
   build(): Uint8Array {
@@ -562,6 +637,74 @@ function drawViewportContainer(
 }
 
 /**
+ * Draws an elevation viewport with aspect-ratio containment and overlays
+ * any 3D measurements as crisp, solid black vector dimension lines and text badges.
+ */
+function drawViewWithDimensions(
+  pdf: PdfWriter,
+  view: CapturedView | undefined,
+  vx: number,
+  vy: number,
+  vw: number,
+  vh: number,
+  title: string,
+  subTitle?: string,
+) {
+  if (!view) return;
+
+  drawViewportContainer(pdf, vx, vy, vw, vh, title, subTitle);
+
+  const containerPadding = 4;
+  const headerHeight = 20;
+  const boxX = vx + containerPadding;
+  const boxY = vy + headerHeight;
+  const boxW = vw - containerPadding * 2;
+  const boxH = vh - headerHeight - containerPadding;
+
+  // 1. Draw image with aspect containment
+  pdf.addImage(view.jpegBytes, view.width, view.height, boxX, boxY, boxW, boxH);
+
+  // Calculate the exact placement box that addImage used
+  let drawW = boxW;
+  let drawH = boxH;
+  let drawX = boxX;
+  let drawY = boxY;
+
+  if (view.width > 0 && view.height > 0) {
+    const imgAspect = view.width / view.height;
+    const boxAspect = boxW / boxH;
+
+    if (boxAspect > imgAspect) {
+      drawH = boxH;
+      drawW = boxH * imgAspect;
+      drawX = boxX + (boxW - drawW) / 2;
+    } else {
+      drawW = boxW;
+      drawH = boxW / imgAspect;
+      drawY = boxY + (boxH - drawH) / 2;
+    }
+  }
+
+  // 2. Draw vector dimension callouts over the elevation view
+  if (view.projectedDimensions && view.projectedDimensions.length > 0) {
+    for (const dim of view.projectedDimensions) {
+      // Map NDC [-1, 1] to PDF coordinates
+      const pAx = drawX + ((dim.ndcA[0] + 1) / 2) * drawW;
+      const pAy = drawY + ((1 - dim.ndcA[1]) / 2) * drawH;
+      const pBx = drawX + ((dim.ndcB[0] + 1) / 2) * drawW;
+      const pBy = drawY + ((1 - dim.ndcB[1]) / 2) * drawH;
+
+      // Draw engineering dimension in solid black
+      pdf.drawDimension(pAx, pAy, pBx, pBy, dim.label, {
+        stroke: PDF_COLORS.black,
+        lineWidth: 0.9,
+        textSize: 7,
+      });
+    }
+  }
+}
+
+/**
  * Generates full multi-page engineering drawing package (PDF)
  * containing standard elevations (Front, Top, Left, Right, ISO) and member schedule.
  */
@@ -590,24 +733,10 @@ export async function generateElevationsPdf(
   drawSheetBorderAndTitleBlock(pdf, 1, totalSheets, 'GENERAL ARRANGEMENT & ELEVATIONS', doc);
 
   // 1. Top View (Plan View) - Top Left
-  if (topView) {
-    const vx = 30;
-    const vy = 54;
-    const vw = 245;
-    const vh = 205;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'PLAN VIEW (LOOKING DOWN)', 'Front at Bottom');
-    pdf.addImage(topView.jpegBytes, topView.width, topView.height, vx + 2, vy + 20, vw - 4, vh - 22);
-  }
+  drawViewWithDimensions(pdf, topView, 30, 54, 245, 205, 'PLAN VIEW (LOOKING DOWN)', 'Front at Bottom');
 
   // 2. Isometric 3D View - Top Middle
-  if (isoView) {
-    const vx = 285;
-    const vy = 54;
-    const vw = 250;
-    const vh = 205;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'ISOMETRIC 3D VIEW (45 deg)', 'South-West Projection');
-    pdf.addImage(isoView.jpegBytes, isoView.width, isoView.height, vx + 2, vy + 20, vw - 4, vh - 22);
-  }
+  drawViewWithDimensions(pdf, isoView, 285, 54, 250, 205, 'ISOMETRIC 3D VIEW (45 deg)', 'South-West Projection');
 
   // 3. Project Notes & Summary - Top Right
   const nx = 545;
@@ -658,39 +787,22 @@ export async function generateElevationsPdf(
   }
 
   pdf.drawText(`Modelled Primitives: ${doc.objects.length} components`, nx + 18, ny + 146, { font: 'regular', size: 8 });
-  pdf.drawText(`Total Steel Weight: ${totalSteelWeight.toFixed(1)} kg`, nx + 18, ny + 158, { font: 'regular', size: 8 });
+  if (doc.measurements.length > 0) {
+    pdf.drawText(`Dimension Callouts: ${doc.measurements.length} spans labelled`, nx + 18, ny + 158, { font: 'regular', size: 8 });
+  } else {
+    pdf.drawText(`Total Steel Weight: ${totalSteelWeight.toFixed(1)} kg`, nx + 18, ny + 158, { font: 'regular', size: 8 });
+  }
   pdf.drawText(`Site Alignment: ${(doc.sceneAlignment ?? 0).toFixed(1)} deg`, nx + 18, ny + 170, { font: 'regular', size: 8 });
   pdf.drawText(`Front Elevation Reference: ${(doc.frontViewAngle ?? doc.sceneAlignment ?? 0).toFixed(1)} deg`, nx + 18, ny + 182, { font: 'regular', size: 8 });
 
   // 4. Front Elevation - Bottom Left
-  if (frontView) {
-    const vx = 30;
-    const vy = 270;
-    const vw = 245;
-    const vh = 225;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'FRONT ELEVATION', 'Level Horizon (Pitch 0 deg)');
-    pdf.addImage(frontView.jpegBytes, frontView.width, frontView.height, vx + 2, vy + 20, vw - 4, vh - 22);
-  }
+  drawViewWithDimensions(pdf, frontView, 30, 270, 245, 225, 'FRONT ELEVATION', 'Level Horizon (Pitch 0 deg)');
 
   // 5. Left Elevation - Bottom Middle
-  if (leftView) {
-    const vx = 285;
-    const vy = 270;
-    const vw = 250;
-    const vh = 225;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'LEFT ELEVATION', '90 deg to Left of Front');
-    pdf.addImage(leftView.jpegBytes, leftView.width, leftView.height, vx + 2, vy + 20, vw - 4, vh - 22);
-  }
+  drawViewWithDimensions(pdf, leftView, 285, 270, 250, 225, 'LEFT ELEVATION', '90 deg to Left of Front');
 
   // 6. Right Elevation - Bottom Right
-  if (rightView) {
-    const vx = 545;
-    const vy = 270;
-    const vw = 265;
-    const vh = 225;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'RIGHT ELEVATION', '90 deg to Right of Front');
-    pdf.addImage(rightView.jpegBytes, rightView.width, rightView.height, vx + 2, vy + 20, vw - 4, vh - 22);
-  }
+  drawViewWithDimensions(pdf, rightView, 545, 270, 265, 225, 'RIGHT ELEVATION', '90 deg to Right of Front');
 
   // ===========================================================================
   // SHEET 2: DETAILED PLAN VIEW (TOP VIEW - LOOKING DOWN)
@@ -698,31 +810,25 @@ export async function generateElevationsPdf(
   pdf.addPage();
   drawSheetBorderAndTitleBlock(pdf, 2, totalSheets, 'PLAN VIEW (TOP VIEW - LOOKING DOWN)', doc);
 
-  if (topView) {
-    const vx = 30;
-    const vy = 54;
-    const vw = 780;
-    const vh = 440;
-    drawViewportContainer(
-      pdf,
-      vx,
-      vy,
-      vw,
-      vh,
-      'PLAN VIEW (LOOKING DOWN)',
-      'Front camera orientation located at bottom of sheet',
-    );
-    pdf.addImage(topView.jpegBytes, topView.width, topView.height, vx + 4, vy + 22, vw - 8, vh - 26);
+  drawViewWithDimensions(
+    pdf,
+    topView,
+    30,
+    54,
+    780,
+    440,
+    'PLAN VIEW (LOOKING DOWN)',
+    'Front camera orientation located at bottom of sheet',
+  );
 
-    // Orientation compass indicator in bottom left of view
-    const cx = vx + 16;
-    const cy = vy + vh - 60;
-    pdf.drawRect(cx, cy, 140, 50, { fill: PDF_COLORS.white, stroke: PDF_COLORS.borderGrey, lineWidth: 0.6 });
-    pdf.drawText('ORIENTATION (TOP VIEW):', cx + 8, cy + 6, { font: 'bold', size: 7, color: PDF_COLORS.textDim });
-    pdf.drawText('TOP OF SHEET: BACK', cx + 8, cy + 18, { font: 'regular', size: 7 });
-    pdf.drawText('BOTTOM OF SHEET: FRONT', cx + 8, cy + 28, { font: 'bold', size: 7, color: PDF_COLORS.cyanAccent });
-    pdf.drawText('LEFT: LEFT  |  RIGHT: RIGHT', cx + 8, cy + 38, { font: 'regular', size: 7 });
-  }
+  // Orientation compass indicator in bottom left of view
+  const cx = 30 + 16;
+  const cy = 54 + 440 - 60;
+  pdf.drawRect(cx, cy, 140, 50, { fill: PDF_COLORS.white, stroke: PDF_COLORS.borderGrey, lineWidth: 0.6 });
+  pdf.drawText('ORIENTATION (TOP VIEW):', cx + 8, cy + 6, { font: 'bold', size: 7, color: PDF_COLORS.textDim });
+  pdf.drawText('TOP OF SHEET: BACK', cx + 8, cy + 18, { font: 'regular', size: 7 });
+  pdf.drawText('BOTTOM OF SHEET: FRONT', cx + 8, cy + 28, { font: 'bold', size: 7, color: PDF_COLORS.cyanAccent });
+  pdf.drawText('LEFT: LEFT  |  RIGHT: RIGHT', cx + 8, cy + 38, { font: 'regular', size: 7 });
 
   // ===========================================================================
   // SHEET 3: FRONT & REAR ELEVATIONS
@@ -730,23 +836,8 @@ export async function generateElevationsPdf(
   pdf.addPage();
   drawSheetBorderAndTitleBlock(pdf, 3, totalSheets, 'FRONT & REAR ELEVATIONS', doc);
 
-  if (frontView) {
-    const vx = 30;
-    const vy = 54;
-    const vw = 385;
-    const vh = 440;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'FRONT ELEVATION', 'Primary Viewing Elevation · Respects UP');
-    pdf.addImage(frontView.jpegBytes, frontView.width, frontView.height, vx + 4, vy + 22, vw - 8, vh - 26);
-  }
-
-  if (backView) {
-    const vx = 425;
-    const vy = 54;
-    const vw = 385;
-    const vh = 440;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'REAR ELEVATION (180 deg)', 'Opposite Front Elevation · Respects UP');
-    pdf.addImage(backView.jpegBytes, backView.width, backView.height, vx + 4, vy + 22, vw - 8, vh - 26);
-  }
+  drawViewWithDimensions(pdf, frontView, 30, 54, 385, 440, 'FRONT ELEVATION', 'Primary Viewing Elevation · Respects UP');
+  drawViewWithDimensions(pdf, backView, 425, 54, 385, 440, 'REAR ELEVATION (180 deg)', 'Opposite Front Elevation · Respects UP');
 
   // ===========================================================================
   // SHEET 4: SIDE ELEVATIONS (LEFT & RIGHT)
@@ -754,23 +845,8 @@ export async function generateElevationsPdf(
   pdf.addPage();
   drawSheetBorderAndTitleBlock(pdf, 4, totalSheets, 'SIDE ELEVATIONS (LEFT & RIGHT)', doc);
 
-  if (leftView) {
-    const vx = 30;
-    const vy = 54;
-    const vw = 385;
-    const vh = 440;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'LEFT ELEVATION', '90 deg to Left of Front Elevation');
-    pdf.addImage(leftView.jpegBytes, leftView.width, leftView.height, vx + 4, vy + 22, vw - 8, vh - 26);
-  }
-
-  if (rightView) {
-    const vx = 425;
-    const vy = 54;
-    const vw = 385;
-    const vh = 440;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'RIGHT ELEVATION', '90 deg to Right of Front Elevation');
-    pdf.addImage(rightView.jpegBytes, rightView.width, rightView.height, vx + 4, vy + 22, vw - 8, vh - 26);
-  }
+  drawViewWithDimensions(pdf, leftView, 30, 54, 385, 440, 'LEFT ELEVATION', '90 deg to Left of Front Elevation');
+  drawViewWithDimensions(pdf, rightView, 425, 54, 385, 440, 'RIGHT ELEVATION', '90 deg to Right of Front Elevation');
 
   // ===========================================================================
   // SHEET 5: ISOMETRIC 3D VIEW & BILL OF MATERIALS (BOM)
@@ -779,14 +855,7 @@ export async function generateElevationsPdf(
   drawSheetBorderAndTitleBlock(pdf, 5, totalSheets, 'ISOMETRIC VIEW & MEMBER SCHEDULE', doc);
 
   // Isometric Hero View (Top Half)
-  if (isoView) {
-    const vx = 30;
-    const vy = 54;
-    const vw = 780;
-    const vh = 200;
-    drawViewportContainer(pdf, vx, vy, vw, vh, 'ISOMETRIC 3D VIEW (45 deg PITCH)', 'South-West Isometric Overview');
-    pdf.addImage(isoView.jpegBytes, isoView.width, isoView.height, vx + 4, vy + 22, vw - 8, vh - 26);
-  }
+  drawViewWithDimensions(pdf, isoView, 30, 54, 780, 200, 'ISOMETRIC 3D VIEW (45 deg PITCH)', 'South-West Isometric Overview');
 
   // Bill of Materials Schedule Table (Bottom Half)
   const tx = 30;
