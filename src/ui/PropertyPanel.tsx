@@ -15,6 +15,7 @@ import type {
 import { computePolyMetrics } from '../viewport/geometry/polyPrism';
 import { computeStairsMetrics } from '../viewport/geometry/stairs';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
+import { registry } from '../viewport/registry';
 
 const COLOR_PRESETS = [
   { label: 'Amber (Duct)', color: '#f59e0b' },
@@ -42,6 +43,11 @@ export function PropertyPanel() {
   const setTool = useApp((s) => s.setTool);
   const setSceneAlignment = useApp((s) => s.setSceneAlignment);
   const sceneAlignment = doc.sceneAlignment ?? 0;
+  const frontViewAngle = doc.frontViewAngle ?? doc.sceneAlignment ?? 0;
+  const setFrontViewAngle = useApp((s) => s.setFrontViewAngle);
+  const rotateFrontView = useApp((s) => s.rotateFrontView);
+  const activeStandardView = useApp((s) => s.activeStandardView);
+  const setView = useApp((s) => s.setView);
 
   if (selection?.type === 'object') {
     const obj = doc.objects.find((o) => o.id === selection.id);
@@ -1208,6 +1214,164 @@ export function PropertyPanel() {
             >
               -45°
             </button>
+          </div>
+        </div>
+
+        {/* Front View Direction */}
+        <div className="section-group">
+          <div className="section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>Front View Direction</span>
+            <button
+              type="button"
+              className="mini-add-btn"
+              onClick={() => registry.setFrontFromCurrentCamera?.(true)}
+              title="Set current camera horizontal orientation as Front View (squares to alignment)"
+            >
+              Set Current as Front
+            </button>
+          </div>
+          <div className="subtext" style={{ marginBottom: 8 }}>
+            Front direction used for Elevations, Plan view, and PDF drawing exports.
+          </div>
+          <NumberField
+            label="Front Angle"
+            suffix="°"
+            value={frontViewAngle}
+            onCommit={(v) => setFrontViewAngle(v)}
+          />
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4, marginTop: 4 }}>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{
+                background: frontViewAngle === sceneAlignment ? 'rgba(56, 189, 248, 0.25)' : undefined,
+                color: frontViewAngle === sceneAlignment ? '#38bdf8' : undefined,
+                fontWeight: frontViewAngle === sceneAlignment ? 700 : 500,
+              }}
+              onClick={() => {
+                setFrontViewAngle(sceneAlignment);
+                setView('front');
+              }}
+              title="Face 1 (0° to grid)"
+            >
+              Face 0°
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{
+                background: frontViewAngle === (sceneAlignment + 90) % 360 ? 'rgba(56, 189, 248, 0.25)' : undefined,
+                color: frontViewAngle === (sceneAlignment + 90) % 360 ? '#38bdf8' : undefined,
+                fontWeight: frontViewAngle === (sceneAlignment + 90) % 360 ? 700 : 500,
+              }}
+              onClick={() => {
+                setFrontViewAngle((sceneAlignment + 90) % 360);
+                setView('front');
+              }}
+              title="Face 2 (+90° to grid)"
+            >
+              +90°
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{
+                background: frontViewAngle === (sceneAlignment + 180) % 360 ? 'rgba(56, 189, 248, 0.25)' : undefined,
+                color: frontViewAngle === (sceneAlignment + 180) % 360 ? '#38bdf8' : undefined,
+                fontWeight: frontViewAngle === (sceneAlignment + 180) % 360 ? 700 : 500,
+              }}
+              onClick={() => {
+                setFrontViewAngle((sceneAlignment + 180) % 360);
+                setView('front');
+              }}
+              title="Face 3 (180° to grid)"
+            >
+              180°
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{
+                background: frontViewAngle === (sceneAlignment + 270) % 360 ? 'rgba(56, 189, 248, 0.25)' : undefined,
+                color: frontViewAngle === (sceneAlignment + 270) % 360 ? '#38bdf8' : undefined,
+                fontWeight: frontViewAngle === (sceneAlignment + 270) % 360 ? 700 : 500,
+              }}
+              onClick={() => {
+                setFrontViewAngle((sceneAlignment + 270) % 360);
+                setView('front');
+              }}
+              title="Face 4 (270° to grid)"
+            >
+              270°
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{ flex: 1 }}
+              onClick={() => rotateFrontView(-90)}
+              title="Turn Front 90° counter-clockwise"
+            >
+              ⟲ -90°
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{ flex: 1 }}
+              onClick={() => rotateFrontView(90)}
+              title="Turn Front 90° clockwise"
+            >
+              ⟳ +90°
+            </button>
+            <button
+              type="button"
+              className="mini-add-btn"
+              style={{ flex: 1 }}
+              onClick={() => rotateFrontView(180)}
+              title="Flip Front 180°"
+            >
+              ⇄ Flip 180°
+            </button>
+          </div>
+        </div>
+
+        {/* Standard Views */}
+        <div className="section-group">
+          <div className="section-title">Standard Aligned Views</div>
+          <div className="subtext" style={{ marginBottom: 8 }}>
+            Quick switch between drafting elevations, plan view, and isometric views.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+            {[
+              { id: 'top', label: 'Top (Plan)', shortcut: '5' },
+              { id: 'front', label: 'Front Elev', shortcut: '1' },
+              { id: 'back', label: 'Back Elev', shortcut: '2' },
+              { id: 'left', label: 'Left Elev', shortcut: '3' },
+              { id: 'right', label: 'Right Elev', shortcut: '4' },
+              { id: 'isoLeft', label: 'ISO Left', shortcut: '7' },
+              { id: 'isoRight', label: 'ISO Right', shortcut: '8' },
+            ].map((v) => (
+              <button
+                key={v.id}
+                type="button"
+                className="mini-add-btn"
+                style={{
+                  padding: '6px 4px',
+                  textAlign: 'center',
+                  background: activeStandardView === v.id ? 'rgba(56, 189, 248, 0.25)' : undefined,
+                  borderColor: activeStandardView === v.id ? 'rgba(56, 189, 248, 0.5)' : undefined,
+                  color: activeStandardView === v.id ? '#38bdf8' : undefined,
+                  fontWeight: activeStandardView === v.id ? 700 : 500,
+                }}
+                onClick={() => setView(v.id as any)}
+                title={`${v.label} (${v.shortcut})`}
+              >
+                {v.label}
+              </button>
+            ))}
           </div>
         </div>
 

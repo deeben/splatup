@@ -8,6 +8,9 @@ export function StatusBar() {
   const pendingA = useApp((s) => s.pendingA);
 
   const sceneAlignment = useApp((s) => s.doc.sceneAlignment ?? 0);
+  const frontViewAngle = useApp((s) => s.doc.frontViewAngle ?? s.doc.sceneAlignment ?? 0);
+  const activeView = useApp((s) => s.activeStandardView);
+  const setView = useApp((s) => s.setView);
   const setTool = useApp((s) => s.setTool);
 
   const defaultHint =
@@ -74,6 +77,20 @@ export function StatusBar() {
             title="Scene Alignment (A) — Click to square scene to an edge"
           >
             🧭 Align {sceneAlignment.toFixed(1)}°
+          </button>
+          <button
+            type="button"
+            className="unit-badge"
+            style={{
+              cursor: 'pointer',
+              background: activeView ? 'rgba(56, 189, 248, 0.25)' : undefined,
+              color: activeView ? '#38bdf8' : undefined,
+              border: activeView ? '1px solid rgba(56, 189, 248, 0.4)' : undefined,
+            }}
+            onClick={() => setView('front')}
+            title={`Active View: ${activeView ? activeView.toUpperCase() : 'Custom Perspective'} · Front reference: ${frontViewAngle.toFixed(1)}° · Click for Front View (1)`}
+          >
+            👁 {activeView ? activeView.toUpperCase() : `Front ${frontViewAngle.toFixed(1)}°`}
           </button>
           <span className="unit-badge">mm</span>
           <span className="unit-badge">Z-Up</span>

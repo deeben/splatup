@@ -180,6 +180,24 @@ export interface Project {
   view: ViewSettings;
   /** Scene orientation / alignment angle in degrees (yaw about user Z). Default 0. */
   sceneAlignment?: number;
+  /** Front view orientation angle in degrees (default equals sceneAlignment). */
+  frontViewAngle?: number;
+}
+
+export type StandardView =
+  | 'front'
+  | 'back'
+  | 'left'
+  | 'right'
+  | 'top'
+  | 'bottom'
+  | 'isoLeft'
+  | 'isoRight';
+
+export interface ViewRequest {
+  view: StandardView;
+  token: number;
+  fitBounds?: boolean;
 }
 
 export type Selection =
@@ -227,5 +245,6 @@ export function newProject(): Project {
     measurements: [],
     view: { clipHeight: null },
     sceneAlignment: 0,
+    frontViewAngle: 0,
   };
 }

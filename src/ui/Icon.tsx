@@ -31,6 +31,10 @@ const paths: Record<string, string> = {
   beam: 'M5 5h14M12 5v14M5 19h14M7 5v2M17 5v2M7 17v2M17 17v2',
   check: 'M20 6L9 17l-5-5',
   warning: 'M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
+  target: 'M12 22a10 10 0 100-20 10 10 0 000 20zM12 6a6 6 0 100 12 6 6 0 000-12zM12 2v4M12 18v4M2 12h4M18 12h4',
+  compass: 'M12 22a10 10 0 100-20 10 10 0 000 20zM16.2 7.8l-2.8 7-7 2.8 2.8-7 7-2.8z',
+  camera: 'M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2zM12 17a4 4 0 100-8 4 4 0 000 8z',
+  chevronDown: 'M6 9l6 6 6-6',
 };
 
 export function Icon({ name, size = 18 }: { name: keyof typeof paths | string; size?: number }) {

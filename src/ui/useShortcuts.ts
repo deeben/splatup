@@ -22,6 +22,7 @@ export function useShortcuts() {
   const addPolyShape = useApp((s) => s.addPolyShape);
   const addHandrail = useApp((s) => s.addHandrail);
   const requestFrame = useApp((s) => s.requestFrame);
+  const setView = useApp((s) => s.setView);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -101,6 +102,27 @@ export function useShortcuts() {
         case 'f':
           requestFrame();
           break;
+        case '1':
+          setView('front');
+          break;
+        case '2':
+          setView('back');
+          break;
+        case '3':
+          setView('left');
+          break;
+        case '4':
+          setView('right');
+          break;
+        case '5':
+          setView('top');
+          break;
+        case '7':
+          setView('isoLeft');
+          break;
+        case '8':
+          setView('isoRight');
+          break;
         case 'enter':
           if (tool === 'polyShape' && drawingPoints.length >= 3) {
             e.preventDefault();
@@ -156,5 +178,6 @@ export function useShortcuts() {
     addPolyShape,
     addHandrail,
     requestFrame,
+    setView,
   ]);
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Viewport } from './viewport/Viewport';
 import { Toolbar } from './ui/Toolbar';
+import { QuickViewBar } from './ui/QuickViewBar';
 import { Sidebar } from './ui/Sidebar';
 import { PropertyPanel } from './ui/PropertyPanel';
 import { Header } from './ui/Header';
@@ -44,6 +45,7 @@ export function App() {
         <div className="viewport-container">
           <Viewport />
           <Toolbar />
+          <QuickViewBar />
 
           {showWelcome && (
             <div className="welcome-overlay">

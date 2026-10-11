@@ -6,6 +6,7 @@ import { ScanLayer } from './ScanLayer';
 import { DesignLayer } from './DesignLayer';
 import { MeasureLayer } from './MeasureLayer';
 import { FrameController, ToolController } from './controllers';
+import { ViewController } from './ViewController';
 
 export function Viewport() {
   const tool = useApp((s) => s.tool);
@@ -57,6 +58,7 @@ export function Viewport() {
       />
       <ToolController />
       <FrameController />
+      <ViewController />
 
       <GizmoHelper alignment="bottom-right" margin={[64, 64]}>
         {/* three Y-up shown as user Z (height), three −Z as user Y */}

@@ -12,8 +12,10 @@ import {
   type ScanAsset,
   type Selection,
   type SnapResult,
+  type StandardView,
   type Tool,
   type Vec3,
+  type ViewRequest,
 } from './types';
 import { uid } from './units';
 
@@ -89,6 +91,18 @@ interface AppState {
 
   /** Set project/scene orientation angle in degrees. */
   setSceneAlignment: (angle: number) => void;
+  /** Set Front view orientation angle in degrees. */
+  setFrontViewAngle: (angle: number) => void;
+  /** Rotate Front view angle by relative delta degrees (+90, -90, 180). */
+  rotateFrontView: (deltaDeg: number) => void;
+
+  /** Currently active standard view ('front', 'top', etc.) or null if in custom view. */
+  activeStandardView: StandardView | null;
+  /** Active view navigation request. */
+  viewRequest: ViewRequest | null;
+  /** Switch to a standard view. */
+  setView: (view: StandardView, fitBounds?: boolean) => void;
+  setActiveStandardView: (view: StandardView | null) => void;
 
   loadProject: (doc: Project, files: Record<string, Blob>) => void;
   resetProject: () => void;
@@ -409,8 +423,43 @@ export const useApp = create<AppState>()((set, get) => ({
     const clean = Math.round(angle * 10) / 10;
     get().commit((d) => {
       d.sceneAlignment = clean;
+      if (d.frontViewAngle === undefined) {
+        d.frontViewAngle = clean;
+      }
     });
   },
+
+  setFrontViewAngle: (angle) => {
+    const clean = Math.round((((angle % 360) + 360) % 360) * 10) / 10;
+    get().commit((d) => {
+      d.frontViewAngle = clean;
+    });
+    const active = get().activeStandardView;
+    if (active) {
+      get().setView(active);
+    }
+  },
+
+  rotateFrontView: (deltaDeg) => {
+    const current = get().doc.frontViewAngle ?? get().doc.sceneAlignment ?? 0;
+    const clean = Math.round(((((current + deltaDeg) % 360) + 360) % 360) * 10) / 10;
+    get().commit((d) => {
+      d.frontViewAngle = clean;
+    });
+    const active = get().activeStandardView;
+    if (active) {
+      get().setView(active);
+    }
+  },
+
+  activeStandardView: null,
+  viewRequest: null,
+  setView: (view, fitBounds) =>
+    set({
+      viewRequest: { view, token: Date.now(), fitBounds },
+      activeStandardView: view,
+    }),
+  setActiveStandardView: (activeStandardView) => set({ activeStandardView }),
 
   setTool: (tool) => set({ tool, pendingA: null, drawingPoints: [], status: '' }),
   select: (selection) => set({ selection }),
@@ -421,7 +470,7 @@ export const useApp = create<AppState>()((set, get) => ({
   setHover: (hover) => set({ hover }),
   setPendingA: (pendingA) => set({ pendingA }),
   setStatus: (status) => set({ status }),
-  requestFrame: () => set((s) => ({ frameRequest: s.frameRequest + 1 })),
+  requestFrame: () => set((s) => ({ frameRequest: s.frameRequest + 1, activeStandardView: null })),
 
   bounds: null,
   setBounds: (bounds) => set({ bounds }),
