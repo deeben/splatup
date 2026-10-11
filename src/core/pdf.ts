@@ -98,6 +98,8 @@ export class PdfWriter {
   /**
    * Embeds a JPEG image onto the current page.
    * x, y specify top-left coordinate in points (top-down).
+   * Automatically preserves image aspect ratio (contain fit) within boxWidthPt and boxHeightPt,
+   * centering the image inside the container.
    */
   addImage(
     jpegBytes: Uint8Array,
@@ -105,8 +107,9 @@ export class PdfWriter {
     heightPx: number,
     x: number,
     yTop: number,
-    widthPt: number,
-    heightPt: number,
+    boxWidthPt: number,
+    boxHeightPt: number,
+    options: { fit?: 'contain' | 'fill' } = { fit: 'contain' },
   ): this {
     if (!this.currentPage) this.addPage();
     const page = this.currentPage!;
@@ -123,13 +126,36 @@ export class PdfWriter {
     };
     page.images.push(imgObj);
 
+    // Calculate aspect-ratio-preserving dimensions (contain)
+    let drawW = boxWidthPt;
+    let drawH = boxHeightPt;
+    let drawX = x;
+    let drawY = yTop;
+
+    if (options.fit === 'contain' && widthPx > 0 && heightPx > 0) {
+      const imgAspect = widthPx / heightPx;
+      const boxAspect = boxWidthPt / boxHeightPt;
+
+      if (boxAspect > imgAspect) {
+        // Container box is wider than image: fit height, center horizontally
+        drawH = boxHeightPt;
+        drawW = boxHeightPt * imgAspect;
+        drawX = x + (boxWidthPt - drawW) / 2;
+      } else {
+        // Container box is taller than image: fit width, center vertically
+        drawW = boxWidthPt;
+        drawH = boxWidthPt / imgAspect;
+        drawY = yTop + (boxHeightPt - drawH) / 2;
+      }
+    }
+
     // Convert top-down y coordinate to PDF bottom-up coordinate
-    const yPdf = page.height - yTop - heightPt;
+    const yPdf = page.height - drawY - drawH;
 
     // Transformation matrix: [w 0 0 h x y cm]
     page.commands.push(
       'q',
-      `${widthPt.toFixed(2)} 0 0 ${heightPt.toFixed(2)} ${x.toFixed(2)} ${yPdf.toFixed(2)} cm`,
+      `${drawW.toFixed(2)} 0 0 ${drawH.toFixed(2)} ${drawX.toFixed(2)} ${yPdf.toFixed(2)} cm`,
       `/${refName} Do`,
       'Q',
     );
@@ -707,17 +733,17 @@ export async function generateElevationsPdf(
   if (frontView) {
     const vx = 30;
     const vy = 54;
-    const vw = 780;
-    const vh = 215;
+    const vw = 385;
+    const vh = 440;
     drawViewportContainer(pdf, vx, vy, vw, vh, 'FRONT ELEVATION', 'Primary Viewing Elevation · Respects UP');
     pdf.addImage(frontView.jpegBytes, frontView.width, frontView.height, vx + 4, vy + 22, vw - 8, vh - 26);
   }
 
   if (backView) {
-    const vx = 30;
-    const vy = 280;
-    const vw = 780;
-    const vh = 215;
+    const vx = 425;
+    const vy = 54;
+    const vw = 385;
+    const vh = 440;
     drawViewportContainer(pdf, vx, vy, vw, vh, 'REAR ELEVATION (180 deg)', 'Opposite Front Elevation · Respects UP');
     pdf.addImage(backView.jpegBytes, backView.width, backView.height, vx + 4, vy + 22, vw - 8, vh - 26);
   }

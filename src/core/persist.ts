@@ -5,6 +5,7 @@ import type { Project } from './types';
 import { generateElevationsPdf } from './pdf';
 import { registry } from '../viewport/registry';
 import { GLTFExporter } from 'three-stdlib';
+import type { Mesh, MeshStandardMaterial, Object3D } from 'three';
 
 /**
  * Local-first persistence.
@@ -181,9 +182,43 @@ export async function exportDesignGlb() {
   setStatus('Exporting 3D primitives to GLB (scan excluded)…');
   try {
     const exporter = new GLTFExporter();
+
+    // Clone designRoot and filter out UI/helper objects (Edges, LineSegments2, noPick)
+    // and make materials solid/opaque for clean CAD import (Revit, Navisworks, Blender)
+    const exportGroup = registry.designRoot.clone(true);
+    const toRemove: Object3D[] = [];
+    exportGroup.traverse((child) => {
+      const anyChild = child as any;
+      if (
+        anyChild.isLine2 ||
+        anyChild.isLineSegments2 ||
+        child.type === 'LineSegments2' ||
+        child.type === 'Line2' ||
+        child.type === 'Line' ||
+        child.type === 'LineSegments' ||
+        child.userData?.noPick
+      ) {
+        toRemove.push(child);
+      } else if ((child as Mesh).isMesh) {
+        const mesh = child as Mesh;
+        const mat = mesh.material as MeshStandardMaterial;
+        if (mat && mat.isMeshStandardMaterial) {
+          const solidMat = mat.clone();
+          solidMat.transparent = false;
+          solidMat.opacity = 1.0;
+          solidMat.polygonOffset = false;
+          mesh.material = solidMat;
+        }
+      }
+    });
+
+    for (const obj of toRemove) {
+      obj.parent?.remove(obj);
+    }
+
     const result = await new Promise<ArrayBuffer>((resolve, reject) => {
       exporter.parse(
-        registry.designRoot!,
+        exportGroup,
         (gltf) => {
           if (gltf instanceof ArrayBuffer) {
             resolve(gltf);

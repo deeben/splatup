@@ -162,6 +162,7 @@ export function ViewController() {
       const prevCamUp = rCam.up.clone();
       const prevCamTarget = controls ? controls.target.clone() : new Vector3();
       const prevCamFov = rCam.fov;
+      const prevCamAspect = rCam.aspect;
       const prevCamNear = rCam.near;
       const prevCamFar = rCam.far;
 
@@ -208,6 +209,8 @@ export function ViewController() {
       const targetW = 1600;
       const targetH = 1200;
       rGl.setSize(targetW, targetH, false);
+      rCam.aspect = targetW / targetH;
+      rCam.updateProjectionMatrix();
 
       try {
         for (const v of viewsToCapture) {
@@ -240,6 +243,7 @@ export function ViewController() {
         rScene.background = prevBg;
 
         rCam.fov = prevCamFov;
+        rCam.aspect = prevCamAspect;
         rCam.near = prevCamNear;
         rCam.far = prevCamFar;
         rCam.position.copy(prevCamPos);
