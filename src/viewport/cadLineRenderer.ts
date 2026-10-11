@@ -333,7 +333,19 @@ export function renderCadElevationLineDrawing(
 
   const hiddenLines: Object3D[] = [];
   scene.traverse((child) => {
-    if ((child as any).isLine || (child as any).isLineSegments || (child as any).isLine2) {
+    const anyChild = child as any;
+    if (
+      anyChild.isLine ||
+      anyChild.isLineSegments ||
+      anyChild.isLine2 ||
+      anyChild.isLineSegments2 ||
+      child.type === 'Line' ||
+      child.type === 'LineSegments' ||
+      child.type === 'Line2' ||
+      child.type === 'LineSegments2' ||
+      child.userData?.noPick ||
+      anyChild.material?.isLineMaterial
+    ) {
       if (child.visible) {
         child.visible = false;
         hiddenLines.push(child);

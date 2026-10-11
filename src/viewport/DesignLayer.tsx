@@ -1,6 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { BufferGeometry, Color, type Group, type Object3D } from 'three';
-import { Edges, TransformControls } from '@react-three/drei';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  BoxGeometry,
+  BufferGeometry,
+  Color,
+  CylinderGeometry,
+  EdgesGeometry,
+  type Group,
+  type Object3D,
+} from 'three';
+import { TransformControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import type { TransformControls as TransformControlsImpl } from 'three-stdlib';
 import { useApp } from '../core/store';
@@ -48,6 +56,29 @@ export function DesignLayer() {
   );
 }
 
+function MeshEdges({
+  geometry,
+  color,
+  threshold = 20,
+}: {
+  geometry: BufferGeometry;
+  color: string;
+  threshold?: number;
+}) {
+  const edgesGeom = useMemo(() => new EdgesGeometry(geometry, threshold), [geometry, threshold]);
+  useEffect(() => {
+    return () => {
+      edgesGeom.dispose();
+    };
+  }, [edgesGeom]);
+
+  return (
+    <lineSegments geometry={edgesGeom} userData={{ noPick: true }}>
+      <lineBasicMaterial color={color} depthTest={true} />
+    </lineSegments>
+  );
+}
+
 function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: boolean }) {
   const position = userToWorldTuple(obj.transform.position);
   const rotation = useMemo(() => userRotToEuler(obj.transform.rotation), [obj.transform.rotation]);
@@ -57,7 +88,12 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
   );
 
   const { geometry, offsetY, snapPoints, showEdges } = useMemo(() => shapeFor(obj), [obj]);
-  const isBufferGeom = geometry instanceof BufferGeometry;
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+    };
+  }, [geometry]);
 
   return (
     <group
@@ -68,11 +104,10 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
       userData={{ objectId: obj.id, snapPoints }}
     >
       <mesh
-        geometry={isBufferGeom ? geometry : undefined}
+        geometry={geometry}
         position={[0, offsetY, 0]}
         renderOrder={2}
       >
-        {!isBufferGeom && (geometry as ReactNode)}
         <meshStandardMaterial
           color={obj.color}
           transparent
@@ -83,7 +118,7 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
           polygonOffsetFactor={1}
           polygonOffsetUnits={1}
         />
-        {showEdges && <Edges color={edgeColor} threshold={20} userData={{ noPick: true }} />}
+        {showEdges && <MeshEdges geometry={geometry} color={edgeColor} threshold={20} />}
       </mesh>
     </group>
   );
@@ -108,7 +143,7 @@ function shapeFor(obj: DesignObject) {
       }
     }
     return {
-      geometry: <boxGeometry args={[L, H, W]} />,
+      geometry: new BoxGeometry(L, H, W),
       offsetY: H / 2,
       snapPoints,
       showEdges: true,
@@ -129,7 +164,7 @@ function shapeFor(obj: DesignObject) {
       snapPoints.push([Math.cos(a) * r, 0, Math.sin(a) * r], [Math.cos(a) * r, len, Math.sin(a) * r]);
     }
     return {
-      geometry: <cylinderGeometry args={[r, r, len, 48]} />,
+      geometry: new CylinderGeometry(r, r, len, 48),
       offsetY: len / 2,
       snapPoints,
       showEdges: true,
@@ -212,7 +247,7 @@ function shapeFor(obj: DesignObject) {
   }
 
   return {
-    geometry: <boxGeometry args={[0.5, 0.5, 0.5]} />,
+    geometry: new BoxGeometry(0.5, 0.5, 0.5),
     offsetY: 0.25,
     snapPoints: [],
     showEdges: true,
