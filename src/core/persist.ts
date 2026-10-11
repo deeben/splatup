@@ -2,6 +2,9 @@ import { get, set, del, keys } from 'idb-keyval';
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate';
 import { useApp } from './store';
 import type { Project } from './types';
+import { generateElevationsPdf } from './pdf';
+import { registry } from '../viewport/registry';
+import { GLTFExporter } from 'three-stdlib';
 
 /**
  * Local-first persistence.
@@ -130,6 +133,114 @@ export async function exportMeasurementsCsv() {
   await saveBlob(new Blob([csv], { type: 'text/csv' }), `${safeName(doc.name)}-schedule.csv`, 'CSV', {
     'text/csv': ['.csv'],
   });
+}
+
+/**
+ * Export 5-sheet Australian Standard (AS 1100) engineering drawing package in PDF format.
+ * Renders Top (Plan), Front, Left, Right, ISO elevations of CAD primitives without scan data,
+ * complete with drawing sheet borders, title blocks, and bill of materials schedule table.
+ */
+export async function exportElevationsPdf() {
+  const { doc, setStatus } = useApp.getState();
+  if (!registry.captureElevationViews) {
+    setStatus('Cannot export PDF: 3D scene not ready');
+    return;
+  }
+  setStatus('Rendering engineering elevation drawings (Front, Top, Left, Right, ISO)…');
+  try {
+    const views = await registry.captureElevationViews();
+    setStatus('Composing AS 1100 PDF drawing package…');
+    const pdfBlob = await generateElevationsPdf(views, doc);
+    await saveBlob(
+      pdfBlob,
+      `${safeName(doc.name)}-elevations.pdf`,
+      'PDF Drawing Package',
+      { 'application/pdf': ['.pdf'] },
+    );
+    setStatus(`✓ Exported engineering drawing package: ${safeName(doc.name)}-elevations.pdf`);
+  } catch (err) {
+    console.error('PDF export error:', err);
+    setStatus(`Failed to generate PDF: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Export CAD primitives as standard GLTF/GLB binary file, leaving out the 3D scan data.
+ * Ideal for importing modelled retrofit steel, handrails, and equipment into Revit, Navisworks, or Blender.
+ */
+export async function exportDesignGlb() {
+  const { doc, setStatus } = useApp.getState();
+  if (doc.objects.length === 0) {
+    setStatus('No 3D primitives to export. Add beams, stairs, handrails, or shapes first.');
+    return;
+  }
+  if (!registry.designRoot) {
+    setStatus('Cannot export 3D model: scene not ready');
+    return;
+  }
+  setStatus('Exporting 3D primitives to GLB (scan excluded)…');
+  try {
+    const exporter = new GLTFExporter();
+    const result = await new Promise<ArrayBuffer>((resolve, reject) => {
+      exporter.parse(
+        registry.designRoot!,
+        (gltf) => {
+          if (gltf instanceof ArrayBuffer) {
+            resolve(gltf);
+          } else {
+            const str = JSON.stringify(gltf);
+            const buf = new TextEncoder().encode(str).buffer;
+            resolve(buf);
+          }
+        },
+        (error) => reject(error),
+        { binary: true },
+      );
+    });
+    const blob = new Blob([result], { type: 'model/gltf-binary' });
+    await saveBlob(
+      blob,
+      `${safeName(doc.name)}-primitives.glb`,
+      'GLB 3D Model',
+      { 'model/gltf-binary': ['.glb'] },
+    );
+    setStatus(`✓ Exported 3D GLB model: ${safeName(doc.name)}-primitives.glb`);
+  } catch (err) {
+    console.error('GLB export error:', err);
+    setStatus(`Failed to export GLB: ${(err as Error).message}`);
+  }
+}
+
+/**
+ * Export high-resolution offscreen renders of all standard elevation views as a ZIP archive.
+ */
+export async function exportViewImagesZip() {
+  const { doc, setStatus } = useApp.getState();
+  if (!registry.captureElevationViews) {
+    setStatus('Cannot capture view images: 3D scene not ready');
+    return;
+  }
+  setStatus('Capturing high-resolution elevation views…');
+  try {
+    const views = await registry.captureElevationViews();
+    const entries: Zippable = {};
+    for (const v of views) {
+      const cleanTitle = v.title.replace(/[^a-zA-Z0-9_-]/g, '_');
+      entries[`${v.id.toUpperCase()}-${cleanTitle}.jpg`] = [v.jpegBytes, { level: 0 }];
+    }
+    const zipped = zipSync(entries, { level: 6 });
+    const blob = new Blob([zipped as BlobPart], { type: 'application/zip' });
+    await saveBlob(
+      blob,
+      `${safeName(doc.name)}-elevation-views.zip`,
+      'Elevation Views ZIP',
+      { 'application/zip': ['.zip'] },
+    );
+    setStatus(`✓ Exported elevation views ZIP`);
+  } catch (err) {
+    console.error('ZIP export error:', err);
+    setStatus(`Failed to export views: ${(err as Error).message}`);
+  }
 }
 
 // ---------------------------------------------------------------- helpers

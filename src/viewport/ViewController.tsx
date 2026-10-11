@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useThree } from '@react-three/fiber';
-import { Box3, PerspectiveCamera, Vector3 } from 'three';
+import { Box3, Color, PerspectiveCamera, Vector2, Vector3 } from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useApp } from '../core/store';
-import { registry } from './registry';
+import { registry, type CapturedView } from './registry';
 import type { StandardView } from '../core/types';
 
 /**
@@ -98,9 +98,11 @@ export function computeViewCamera(
 }
 
 /**
- * Controller managing aligned camera views and smooth animations.
+ * Controller managing aligned camera views, smooth animations, and elevation exports.
  */
 export function ViewController() {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const controls = useThree((s) => s.controls) as OrbitControlsImpl | null;
   const viewRequest = useApp((s) => s.viewRequest);
@@ -111,6 +113,8 @@ export function ViewController() {
   useEffect(() => {
     registry.camera = camera;
     registry.controls = controls;
+    registry.gl = gl;
+    registry.scene = scene;
 
     registry.getCurrentCameraAzimuth = () => {
       const pos = camera.position;
@@ -142,13 +146,125 @@ export function ViewController() {
       return finalAngle;
     };
 
+    registry.captureElevationViews = async () => {
+      if (!registry.gl || !registry.scene || !registry.camera) {
+        throw new Error('Viewport renderer not initialized');
+      }
+      const rGl = registry.gl;
+      const rScene = registry.scene;
+      const rCam = registry.camera as PerspectiveCamera;
+
+      // 1. Save previous state
+      const prevScanVis = registry.scanRoot ? registry.scanRoot.visible : true;
+      const prevGizmoVis = registry.transformControls ? registry.transformControls.visible : true;
+      const prevBg = rScene.background;
+      const prevCamPos = rCam.position.clone();
+      const prevCamUp = rCam.up.clone();
+      const prevCamTarget = controls ? controls.target.clone() : new Vector3();
+      const prevCamFov = rCam.fov;
+      const prevCamNear = rCam.near;
+      const prevCamFar = rCam.far;
+
+      // Hide scan data and transform gizmo, keep CAD primitives only
+      if (registry.scanRoot) registry.scanRoot.visible = false;
+      if (registry.transformControls) registry.transformControls.visible = false;
+      if (registry.designRoot) registry.designRoot.visible = true;
+
+      // Set clean architectural white background
+      rScene.background = new Color('#ffffff');
+
+      // 2. Compute bounding box of design primitives
+      const box = new Box3();
+      if (registry.designRoot) box.expandByObject(registry.designRoot);
+      if (box.isEmpty()) {
+        box.set(new Vector3(-1, 0, -1), new Vector3(1, 1.5, 1));
+      }
+      const center = box.getCenter(new Vector3());
+      const size = box.getSize(new Vector3());
+      const radius = Math.max(size.length() / 2, 0.5);
+
+      // Telephoto FOV 35° minimizes perspective distortion for engineering drawings
+      rCam.fov = 35;
+      const fovRad = (35 * Math.PI) / 180;
+      const distance = (radius / Math.sin(fovRad / 2)) * 1.15;
+      rCam.near = Math.max(distance / 500, 0.01);
+      rCam.far = distance * 20;
+
+      const frontAngle = useApp.getState().doc.frontViewAngle ?? useApp.getState().doc.sceneAlignment ?? 0;
+
+      const viewsToCapture: { id: StandardView; title: string; subTitle: string }[] = [
+        { id: 'top', title: 'PLAN VIEW (TOP VIEW)', subTitle: 'Looking Down · Front at Bottom' },
+        { id: 'front', title: 'FRONT ELEVATION', subTitle: 'Level Eye Elevation · Respects UP' },
+        { id: 'left', title: 'LEFT ELEVATION', subTitle: '90° Left Elevation' },
+        { id: 'right', title: 'RIGHT ELEVATION', subTitle: '90° Right Elevation' },
+        { id: 'back', title: 'BACK ELEVATION', subTitle: '180° Rear Elevation' },
+        { id: 'isoLeft', title: 'ISOMETRIC VIEW (45°)', subTitle: 'South-West Isometric 3D' },
+      ];
+
+      const captured: CapturedView[] = [];
+
+      // Render at 1600x1200 for crisp drawing sheets
+      const origSize = rGl.getSize(new Vector2());
+      const targetW = 1600;
+      const targetH = 1200;
+      rGl.setSize(targetW, targetH, false);
+
+      try {
+        for (const v of viewsToCapture) {
+          const { position, target, up } = computeViewCamera(v.id, frontAngle, center, distance);
+          rCam.position.copy(position);
+          rCam.up.copy(up);
+          rCam.lookAt(target);
+          rCam.updateProjectionMatrix();
+
+          rGl.render(rScene, rCam);
+
+          const dataUrl = rGl.domElement.toDataURL('image/jpeg', 0.92);
+          const res = await fetch(dataUrl);
+          const buf = await res.arrayBuffer();
+
+          captured.push({
+            id: v.id,
+            title: v.title,
+            subTitle: v.subTitle,
+            dataUrl,
+            jpegBytes: new Uint8Array(buf),
+            width: targetW,
+            height: targetH,
+          });
+        }
+      } finally {
+        // Restore all previous states
+        if (registry.scanRoot) registry.scanRoot.visible = prevScanVis;
+        if (registry.transformControls) registry.transformControls.visible = prevGizmoVis;
+        rScene.background = prevBg;
+
+        rCam.fov = prevCamFov;
+        rCam.near = prevCamNear;
+        rCam.far = prevCamFar;
+        rCam.position.copy(prevCamPos);
+        rCam.up.copy(prevCamUp);
+        if (controls) controls.target.copy(prevCamTarget);
+        rCam.updateProjectionMatrix();
+        if (controls) controls.update();
+
+        rGl.setSize(origSize.x, origSize.y, false);
+        rGl.render(rScene, rCam);
+      }
+
+      return captured;
+    };
+
     return () => {
       registry.camera = null;
       registry.controls = null;
+      registry.gl = null;
+      registry.scene = null;
       registry.setFrontFromCurrentCamera = undefined;
       registry.getCurrentCameraAzimuth = undefined;
+      registry.captureElevationViews = undefined;
     };
-  }, [camera, controls]);
+  }, [camera, controls, gl, scene]);
 
   // Clear active standard view when user manually orbits
   useEffect(() => {
