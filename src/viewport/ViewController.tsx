@@ -6,6 +6,7 @@ import { useApp } from '../core/store';
 import { registry, type CapturedView, type ProjectedDimension } from './registry';
 import { userToWorld } from '../core/frame';
 import type { StandardView } from '../core/types';
+import { renderCadElevationLineDrawing, setupOrthoCamera } from './cadLineRenderer';
 
 /**
  * Returns horizontal unit vector pointing towards azimuth angle (in degrees, user coords).
@@ -178,32 +179,50 @@ export function ViewController() {
       // Set clean architectural white background
       rScene.background = new Color('#ffffff');
 
-      // 2. Compute bounding box of design primitives
-      const box = new Box3();
-      if (registry.designRoot) box.expandByObject(registry.designRoot);
-      if (box.isEmpty()) {
-        box.set(new Vector3(-1, 0, -1), new Vector3(1, 1.5, 1));
-      }
-      const center = box.getCenter(new Vector3());
-      const size = box.getSize(new Vector3());
-      const radius = Math.max(size.length() / 2, 0.5);
-
-      // Telephoto FOV 35° minimizes perspective distortion for engineering drawings
-      rCam.fov = 35;
-      const fovRad = (35 * Math.PI) / 180;
-      const distance = (radius / Math.sin(fovRad / 2)) * 1.15;
-      rCam.near = Math.max(distance / 500, 0.01);
-      rCam.far = distance * 20;
-
       const frontAngle = useApp.getState().doc.frontViewAngle ?? useApp.getState().doc.sceneAlignment ?? 0;
 
-      const viewsToCapture: { id: StandardView; title: string; subTitle: string }[] = [
-        { id: 'top', title: 'PLAN VIEW (TOP VIEW)', subTitle: 'Looking Down · Front at Bottom' },
-        { id: 'front', title: 'FRONT ELEVATION', subTitle: 'Level Eye Elevation · Respects UP' },
-        { id: 'left', title: 'LEFT ELEVATION', subTitle: '90° Left Elevation' },
-        { id: 'right', title: 'RIGHT ELEVATION', subTitle: '90° Right Elevation' },
-        { id: 'back', title: 'BACK ELEVATION', subTitle: '180° Rear Elevation' },
-        { id: 'isoLeft', title: 'ISOMETRIC VIEW (45°)', subTitle: 'South-West Isometric 3D' },
+      const viewsToCapture: {
+        id: StandardView;
+        title: string;
+        subTitle: string;
+        isCadLine: boolean;
+      }[] = [
+        {
+          id: 'top',
+          title: 'PLAN VIEW (TOP VIEW)',
+          subTitle: 'Looking Down · Front at Bottom · B&W CAD Drafting',
+          isCadLine: true,
+        },
+        {
+          id: 'front',
+          title: 'FRONT ELEVATION',
+          subTitle: 'Level Eye Elevation · Respects UP · B&W CAD Drafting',
+          isCadLine: true,
+        },
+        {
+          id: 'left',
+          title: 'LEFT ELEVATION',
+          subTitle: '90° Left Elevation · B&W CAD Drafting',
+          isCadLine: true,
+        },
+        {
+          id: 'right',
+          title: 'RIGHT ELEVATION',
+          subTitle: '90° Right Elevation · B&W CAD Drafting',
+          isCadLine: true,
+        },
+        {
+          id: 'back',
+          title: 'BACK ELEVATION',
+          subTitle: '180° Rear Elevation · B&W CAD Drafting',
+          isCadLine: true,
+        },
+        {
+          id: 'isoLeft',
+          title: 'ISOMETRIC VIEW (45°)',
+          subTitle: 'South-West Isometric 3D Projection',
+          isCadLine: false,
+        },
       ];
 
       const captured: CapturedView[] = [];
@@ -213,32 +232,42 @@ export function ViewController() {
       const targetW = 1600;
       const targetH = 1200;
       rGl.setSize(targetW, targetH, false);
-      rCam.aspect = targetW / targetH;
-      rCam.updateProjectionMatrix();
 
       const docMeasurements = useApp.getState().doc.measurements;
+      const measurementPoints = docMeasurements.flatMap((m) => [userToWorld(m.a), userToWorld(m.b)]);
 
       try {
         for (const v of viewsToCapture) {
-          const { position, target, up } = computeViewCamera(v.id, frontAngle, center, distance);
-          rCam.position.copy(position);
-          rCam.up.copy(up);
-          rCam.lookAt(target);
-          rCam.updateProjectionMatrix();
+          // Set up true Orthographic Camera tailored to this exact elevation view
+          const { camera: orthoCam } = setupOrthoCamera(
+            v.id,
+            frontAngle,
+            registry.designRoot,
+            measurementPoints,
+            targetW / targetH,
+            1.25,
+          );
 
-          rGl.render(rScene, rCam);
+          if (v.isCadLine) {
+            // Render pure black-and-white CAD line drawing with hidden-line removal
+            renderCadElevationLineDrawing(rGl, rScene, orthoCam, targetW, targetH);
+          } else {
+            // Render 3D shaded model in clean orthographic isometric projection
+            rScene.background = new Color('#ffffff');
+            rGl.render(rScene, orthoCam);
+          }
 
-          const dataUrl = rGl.domElement.toDataURL('image/jpeg', 0.92);
+          const dataUrl = rGl.domElement.toDataURL('image/jpeg', 0.95);
           const res = await fetch(dataUrl);
           const buf = await res.arrayBuffer();
 
-          // Calculate 2D projected dimensions for this elevation view
+          // Calculate 2D projected dimensions for this elevation view using orthographic camera projection
           const projectedDimensions: ProjectedDimension[] = [];
           for (const m of docMeasurements) {
             const wa = userToWorld(m.a);
             const wb = userToWorld(m.b);
-            const pA = wa.clone().project(rCam);
-            const pB = wb.clone().project(rCam);
+            const pA = wa.clone().project(orthoCam);
+            const pB = wb.clone().project(orthoCam);
 
             // Skip if points are behind camera or beyond far plane
             if (pA.z < -1 || pA.z > 1 || pB.z < -1 || pB.z > 1) continue;

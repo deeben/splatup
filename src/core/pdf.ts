@@ -733,10 +733,10 @@ export async function generateElevationsPdf(
   drawSheetBorderAndTitleBlock(pdf, 1, totalSheets, 'GENERAL ARRANGEMENT & ELEVATIONS', doc);
 
   // 1. Top View (Plan View) - Top Left
-  drawViewWithDimensions(pdf, topView, 30, 54, 245, 205, 'PLAN VIEW (LOOKING DOWN)', 'Front at Bottom');
+  drawViewWithDimensions(pdf, topView, 30, 54, 245, 205, 'PLAN VIEW (LOOKING DOWN)', 'Orthographic · Front at Bottom · B&W');
 
   // 2. Isometric 3D View - Top Middle
-  drawViewWithDimensions(pdf, isoView, 285, 54, 250, 205, 'ISOMETRIC 3D VIEW (45 deg)', 'South-West Projection');
+  drawViewWithDimensions(pdf, isoView, 285, 54, 250, 205, 'ISOMETRIC 3D VIEW (45 deg)', 'South-West 3D Isometric Projection');
 
   // 3. Project Notes & Summary - Top Right
   const nx = 545;
@@ -756,7 +756,7 @@ export async function generateElevationsPdf(
 
   const notes = [
     '1. All dimensions are in millimetres (mm) unless noted.',
-    '2. Standard engineering elevations generated from 3D model.',
+    '2. Elevations rendered as orthographic B&W CAD line drawings (AS 1100).',
     '3. Top view oriented with Front camera at bottom of page.',
     '4. Point cloud scan data excluded for engineering clarity.',
     '5. Handrails conform to Monowills specification / AS 1657.',
@@ -796,19 +796,19 @@ export async function generateElevationsPdf(
   pdf.drawText(`Front Elevation Reference: ${(doc.frontViewAngle ?? doc.sceneAlignment ?? 0).toFixed(1)} deg`, nx + 18, ny + 182, { font: 'regular', size: 8 });
 
   // 4. Front Elevation - Bottom Left
-  drawViewWithDimensions(pdf, frontView, 30, 270, 245, 225, 'FRONT ELEVATION', 'Level Horizon (Pitch 0 deg)');
+  drawViewWithDimensions(pdf, frontView, 30, 270, 245, 225, 'FRONT ELEVATION', 'Orthographic · Level Horizon · B&W Line');
 
   // 5. Left Elevation - Bottom Middle
-  drawViewWithDimensions(pdf, leftView, 285, 270, 250, 225, 'LEFT ELEVATION', '90 deg to Left of Front');
+  drawViewWithDimensions(pdf, leftView, 285, 270, 250, 225, 'LEFT ELEVATION', 'Orthographic · 90 deg Left · B&W Line');
 
   // 6. Right Elevation - Bottom Right
-  drawViewWithDimensions(pdf, rightView, 545, 270, 265, 225, 'RIGHT ELEVATION', '90 deg to Right of Front');
+  drawViewWithDimensions(pdf, rightView, 545, 270, 265, 225, 'RIGHT ELEVATION', 'Orthographic · 90 deg Right · B&W Line');
 
   // ===========================================================================
   // SHEET 2: DETAILED PLAN VIEW (TOP VIEW - LOOKING DOWN)
   // ===========================================================================
   pdf.addPage();
-  drawSheetBorderAndTitleBlock(pdf, 2, totalSheets, 'PLAN VIEW (TOP VIEW - LOOKING DOWN)', doc);
+  drawSheetBorderAndTitleBlock(pdf, 2, totalSheets, 'PLAN VIEW (ORTHOGRAPHIC TOP VIEW)', doc);
 
   drawViewWithDimensions(
     pdf,
@@ -817,8 +817,8 @@ export async function generateElevationsPdf(
     54,
     780,
     440,
-    'PLAN VIEW (LOOKING DOWN)',
-    'Front camera orientation located at bottom of sheet',
+    'PLAN VIEW (LOOKING DOWN - ORTHOGRAPHIC)',
+    'Parallel projection · Front camera at bottom of sheet · B&W CAD Drafting',
   );
 
   // Orientation compass indicator in bottom left of view
@@ -834,19 +834,19 @@ export async function generateElevationsPdf(
   // SHEET 3: FRONT & REAR ELEVATIONS
   // ===========================================================================
   pdf.addPage();
-  drawSheetBorderAndTitleBlock(pdf, 3, totalSheets, 'FRONT & REAR ELEVATIONS', doc);
+  drawSheetBorderAndTitleBlock(pdf, 3, totalSheets, 'FRONT & REAR ORTHOGRAPHIC ELEVATIONS', doc);
 
-  drawViewWithDimensions(pdf, frontView, 30, 54, 385, 440, 'FRONT ELEVATION', 'Primary Viewing Elevation · Respects UP');
-  drawViewWithDimensions(pdf, backView, 425, 54, 385, 440, 'REAR ELEVATION (180 deg)', 'Opposite Front Elevation · Respects UP');
+  drawViewWithDimensions(pdf, frontView, 30, 54, 385, 440, 'FRONT ELEVATION', 'Orthographic Projection · Respects UP · B&W CAD Drafting');
+  drawViewWithDimensions(pdf, backView, 425, 54, 385, 440, 'REAR ELEVATION (180 deg)', 'Orthographic Projection · Respects UP · B&W CAD Drafting');
 
   // ===========================================================================
   // SHEET 4: SIDE ELEVATIONS (LEFT & RIGHT)
   // ===========================================================================
   pdf.addPage();
-  drawSheetBorderAndTitleBlock(pdf, 4, totalSheets, 'SIDE ELEVATIONS (LEFT & RIGHT)', doc);
+  drawSheetBorderAndTitleBlock(pdf, 4, totalSheets, 'SIDE ELEVATIONS (LEFT & RIGHT - ORTHOGRAPHIC)', doc);
 
-  drawViewWithDimensions(pdf, leftView, 30, 54, 385, 440, 'LEFT ELEVATION', '90 deg to Left of Front Elevation');
-  drawViewWithDimensions(pdf, rightView, 425, 54, 385, 440, 'RIGHT ELEVATION', '90 deg to Right of Front Elevation');
+  drawViewWithDimensions(pdf, leftView, 30, 54, 385, 440, 'LEFT ELEVATION', 'Orthographic · 90 deg Left of Front · B&W CAD Drafting');
+  drawViewWithDimensions(pdf, rightView, 425, 54, 385, 440, 'RIGHT ELEVATION', 'Orthographic · 90 deg Right of Front · B&W CAD Drafting');
 
   // ===========================================================================
   // SHEET 5: ISOMETRIC 3D VIEW & BILL OF MATERIALS (BOM)
