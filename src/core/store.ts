@@ -56,6 +56,10 @@ interface AppState {
 
   addObject: (kind: DesignKind, at: Vec3) => string;
   updateObject: (id: string, recipe: (o: Draft<DesignObject>) => void) => void;
+  /** Transient update during drag (does not push undo history) */
+  updateObjectLive: (id: string, recipe: (o: Draft<DesignObject>) => void) => void;
+  /** Commit undo history snapshot after dragging completes */
+  commitChange: (snapshotBefore: Project) => void;
   duplicateObject: (id: string) => void;
 
   addMeasurement: (a: Vec3, b: Vec3) => string;
@@ -288,6 +292,26 @@ export const useApp = create<AppState>()((set, get) => ({
       const o = d.objects.find((x) => x.id === id);
       if (o) recipe(o);
     }),
+
+  updateObjectLive: (id, recipe) => {
+    const prev = get().doc;
+    const next = produce(prev, (d) => {
+      const o = d.objects.find((x) => x.id === id);
+      if (o) recipe(o);
+    });
+    if (next !== prev) {
+      set({ doc: next });
+    }
+  },
+
+  commitChange: (snapshotBefore) => {
+    const current = get().doc;
+    if (current === snapshotBefore) return;
+    set((s) => ({
+      past: [...s.past, snapshotBefore].slice(-HISTORY_LIMIT),
+      future: [],
+    }));
+  },
 
   duplicateObject: (id) => {
     const src = get().doc.objects.find((o) => o.id === id);

@@ -94,8 +94,8 @@ export function Header() {
     <header className="app-header">
       <div className="header-left">
         <div className="app-logo">
-          <span className="logo-box" />
-          <span className="logo-text">SplatUp</span>
+          <img src="/splatup-icon.png" alt="SplatUp Icon" className="app-logo-icon" />
+          <img src="/splatup-text.png" alt="SplatUp" className="app-logo-text" />
         </div>
         <div className="project-title-container">
           <input

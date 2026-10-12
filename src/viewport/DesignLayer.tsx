@@ -29,6 +29,7 @@ import { buildPolyPrismGeometry } from './geometry/polyPrism';
 import { buildAccessLadder, buildMonowillsHandrail, buildSwingGate } from './geometry/monowills';
 import { buildStairsGeometry } from './geometry/stairs';
 import { buildSteelBeamGeometry } from './geometry/steelSections';
+import { PullHandles } from './PullHandles';
 
 export function DesignLayer() {
   const objects = useApp((s) => s.doc.objects);
@@ -43,6 +44,7 @@ export function DesignLayer() {
   }, []);
 
   const selectedId = selection?.type === 'object' ? selection.id : null;
+  const selectedObj = selectedId ? objects.find((o) => o.id === selectedId) : null;
 
   return (
     <>
@@ -52,6 +54,7 @@ export function DesignLayer() {
         ))}
       </group>
       {selectedId && <Gizmo id={selectedId} />}
+      {selectedObj && <PullHandles obj={selectedObj} />}
     </>
   );
 }
