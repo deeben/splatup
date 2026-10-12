@@ -37,6 +37,8 @@ export const registry: {
   controls: OrbitControlsImpl | null;
   gl: WebGLRenderer | null;
   scene: Scene | null;
+  activeHandleDragging: boolean;
+  isHoveringHandle: boolean;
   setFrontFromCurrentCamera?: (snapToAlignment?: boolean) => number | null;
   getCurrentCameraAzimuth?: () => number;
   captureElevationViews?: () => Promise<CapturedView[]>;
@@ -49,5 +51,7 @@ export const registry: {
   controls: null,
   gl: null,
   scene: null,
+  activeHandleDragging: false,
+  isHoveringHandle: false,
 };
 

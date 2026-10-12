@@ -93,6 +93,7 @@ function SingleHandle({
   const [dragging, setDragging] = useState(false);
   const [liveDeltaMm, setLiveDeltaMm] = useState(0);
 
+  const isDraggingRef = useRef(false);
   const handleMeshRef = useRef<Group>(null);
   const initialDocRef = useRef<Project | null>(null);
   const dragStartDataRef = useRef<{
@@ -107,11 +108,28 @@ function SingleHandle({
     if (!handleMeshRef.current) return;
     handleMeshRef.current.getWorldPosition(_v);
     const dist = camera.position.distanceTo(_v);
-    // Base scale proportional to distance, clamped
     const baseScale = Math.max(0.45, Math.min(2.5, dist * 0.16));
     const activeMultiplier = dragging ? 1.35 : hovered ? 1.22 : 1.0;
     handleMeshRef.current.scale.setScalar(baseScale * activeMultiplier);
   });
+
+  const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setHovered(true);
+    registry.isHoveringHandle = true;
+    if (registry.controls) registry.controls.enabled = false;
+    document.body.style.cursor = 'grab';
+  };
+
+  const handlePointerOut = (e: ThreeEvent<PointerEvent>) => {
+    e.stopPropagation();
+    setHovered(false);
+    if (!isDraggingRef.current) {
+      registry.isHoveringHandle = false;
+      if (registry.controls) registry.controls.enabled = true;
+      document.body.style.cursor = 'default';
+    }
+  };
 
   const onPointerDown = (e: ThreeEvent<PointerEvent>) => {
     if (e.button !== 0) return; // Primary left button only
@@ -120,6 +138,10 @@ function SingleHandle({
     const group = groupRef.current;
     const handleGroup = handleMeshRef.current;
     if (!group || !handleGroup) return;
+
+    isDraggingRef.current = true;
+    registry.activeHandleDragging = true;
+    registry.isHoveringHandle = true;
 
     // Temporarily disable OrbitControls and TransformControls
     if (registry.controls) registry.controls.enabled = false;
@@ -207,6 +229,10 @@ function SingleHandle({
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
 
+      isDraggingRef.current = false;
+      registry.activeHandleDragging = false;
+      registry.isHoveringHandle = false;
+
       setDragging(false);
       setLiveDeltaMm(0);
       document.body.style.cursor = 'default';
@@ -253,45 +279,48 @@ function SingleHandle({
           </mesh>
         </group>
 
-        {/* Tactile pull knob / cube */}
+        {/* Generous invisible hit-proxy sphere (140mm diameter) for effortless grabbing */}
         <mesh
           position={[axis.x * 0.06, axis.y * 0.06, axis.z * 0.06]}
           userData={{ noPick: true }}
-          onPointerOver={(e) => {
-            e.stopPropagation();
-            setHovered(true);
-            document.body.style.cursor = 'grab';
-          }}
-          onPointerOut={(e) => {
-            e.stopPropagation();
-            setHovered(false);
-            if (!dragging) document.body.style.cursor = 'default';
-          }}
+          onPointerOver={handlePointerOver}
+          onPointerOut={handlePointerOut}
           onPointerDown={onPointerDown}
         >
-          <boxGeometry args={[0.045, 0.045, 0.045]} />
+          <sphereGeometry args={[0.07, 12, 12]} />
+          <meshBasicMaterial transparent opacity={0} depthTest={false} depthWrite={false} />
+        </mesh>
+
+        {/* Visible tactile pull knob / cube */}
+        <mesh
+          position={[axis.x * 0.06, axis.y * 0.06, axis.z * 0.06]}
+          userData={{ noPick: true }}
+        >
+          <boxGeometry args={[0.048, 0.048, 0.048]} />
           <meshStandardMaterial
             color={color}
             emissive={emissive}
-            emissiveIntensity={dragging ? 0.7 : hovered ? 0.5 : 0.25}
+            emissiveIntensity={dragging ? 0.75 : hovered ? 0.55 : 0.25}
             roughness={0.2}
             metalness={0.3}
             depthTest={false}
           />
         </mesh>
 
-        {/* Live dimension badge tooltip */}
-        {(hovered || dragging) && (
+        {/* Live dimension badge tooltip - ONLY shown when actively dragging, NEVER on hover */}
+        {dragging && (
           <Html
-            position={[axis.x * 0.06, axis.y * 0.06 + 0.06, axis.z * 0.06]}
+            position={[axis.x * 0.06, axis.y * 0.06 + 0.12, axis.z * 0.06]}
             center
             distanceFactor={10}
             zIndexRange={[100, 0]}
+            pointerEvents="none"
+            style={{ pointerEvents: 'none' }}
           >
-            <div className="pull-handle-badge">
+            <div className="pull-handle-badge" style={{ pointerEvents: 'none' }}>
               <span className="pull-handle-dim">{handle.label}</span>
               <span className="pull-handle-val">{Math.round(currentVal)} mm</span>
-              {dragging && liveDeltaMm !== 0 && (
+              {liveDeltaMm !== 0 && (
                 <span className={`pull-handle-delta ${liveDeltaMm > 0 ? 'pos' : 'neg'}`}>
                   {liveDeltaMm > 0 ? `+${Math.round(liveDeltaMm)}` : Math.round(liveDeltaMm)}
                 </span>

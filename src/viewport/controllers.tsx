@@ -63,18 +63,21 @@ export function ToolController() {
 
     const onDown = (e: PointerEvent) => {
       const tc = registry.transformControls as unknown as { axis?: unknown } | null;
-      down = { x: e.clientX, y: e.clientY, button: e.button, gizmo: !!tc?.axis };
+      const isGizmo = !!tc?.axis || registry.activeHandleDragging || registry.isHoveringHandle;
+      down = { x: e.clientX, y: e.clientY, button: e.button, gizmo: isGizmo };
     };
 
     const onUp = (e: PointerEvent) => {
       const d = down;
       down = null;
       if (!d || d.gizmo || d.button !== 0) return;
+      if (registry.activeHandleDragging || registry.isHoveringHandle) return;
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > CLICK_TOLERANCE_PX) return;
       handleClick(e);
     };
 
     const handleClick = (e: PointerEvent) => {
+      if (registry.activeHandleDragging || registry.isHoveringHandle) return;
       const st = useApp.getState();
       switch (st.tool) {
         case 'select': {
