@@ -75,7 +75,10 @@ export async function exportProjectFile() {
   };
   for (const s of doc.scans) {
     const blob = scanFiles[s.id];
-    if (blob) entries[`scans/${s.id}.glb`] = [new Uint8Array(await blob.arrayBuffer()), { level: 0 }];
+    if (blob) {
+      const ext = s.fileName.split('.').pop()?.toLowerCase() || 'glb';
+      entries[`scans/${s.id}.${ext}`] = [new Uint8Array(await blob.arrayBuffer()), { level: 0 }];
+    }
   }
   const zipped = zipSync(entries, { level: 6 });
   const blob = new Blob([zipped as BlobPart], { type: 'application/zip' });
@@ -89,8 +92,15 @@ export async function importProjectFile(file: Blob) {
   const doc = JSON.parse(strFromU8(json)) as Project;
   const files: Record<string, Blob> = {};
   for (const s of doc.scans) {
-    const data = zip[`scans/${s.id}.glb`];
-    if (data) files[s.id] = new Blob([data as BlobPart], { type: 'model/gltf-binary' });
+    const ext = s.fileName.split('.').pop()?.toLowerCase() || 'glb';
+    const data =
+      zip[`scans/${s.id}.${ext}`] ||
+      zip[`scans/${s.id}.glb`] ||
+      zip[`scans/${s.id}.ply`] ||
+      zip[`scans/${s.id}.las`] ||
+      zip[`scans/${s.id}.laz`] ||
+      zip[`scans/${s.fileName}`];
+    if (data) files[s.id] = new Blob([data as BlobPart]);
   }
   savedBlobs.clear();
   useApp.getState().loadProject(doc, files);

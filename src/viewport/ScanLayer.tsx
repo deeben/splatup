@@ -6,12 +6,16 @@ import {
   Group,
   Mesh,
   MeshBasicMaterial,
+  MeshStandardMaterial,
   Plane,
+  Points,
+  PointsMaterial,
   Vector3,
   type Material,
-  type MeshStandardMaterial,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
+import { parseLas } from './loaders/lasLoader';
 import { useApp } from '../core/store';
 import { worldToUser } from '../core/frame';
 import { registry } from './registry';
@@ -86,23 +90,88 @@ function ScanModel({ asset, blob, planes, onLoaded }: ScanModelProps) {
     let loaded: Group | null = null;
     const { setStatus, requestFrame } = useApp.getState();
     setStatus(`Loading ${asset.fileName}…`);
+
     (async () => {
       try {
         const buf = await blob.arrayBuffer();
-        const gltf = await new GLTFLoader().parseAsync(buf, '');
         if (cancelled) return;
-        loaded = gltf.scene;
+
+        const ext = asset.fileName.split('.').pop()?.toLowerCase() || '';
+        const isPly = ext === 'ply';
+        const isLas = ext === 'las' || ext === 'laz';
+
+        loaded = new Group();
         let tris = 0;
-        loaded.traverse((o) => {
-          const m = o as Mesh;
-          if (!m.isMesh) return;
-          m.geometry.computeBoundsTree();
-          tris += (m.geometry.index?.count ?? m.geometry.getAttribute('position').count) / 3;
-          m.userData.originalMaterial = m.material;
-        });
+        let pts = 0;
+
+        if (isLas) {
+          // Parse ASPRS binary LiDAR format
+          const res = parseLas(buf);
+          const mat = new PointsMaterial({
+            size: asset.pointSize ?? 0.015,
+            vertexColors: res.hasColors,
+            color: res.hasColors ? 0xffffff : 0x38bdf8,
+            sizeAttenuation: true,
+          });
+          const points = new Points(res.geometry, mat);
+          points.userData.originalMaterial = mat;
+          points.userData.isPointCloud = true;
+          loaded.add(points);
+          pts = res.pointCount;
+        } else if (isPly) {
+          // Parse PLY mesh or point cloud
+          const loader = new PLYLoader();
+          const geom = loader.parse(buf);
+
+          if (geom.index && geom.index.count > 0) {
+            // Triangle mesh
+            if (!geom.attributes.normal) geom.computeVertexNormals();
+            geom.computeBoundsTree();
+            const mat = new MeshStandardMaterial({
+              vertexColors: Boolean(geom.attributes.color),
+              roughness: 0.6,
+              metalness: 0.1,
+            });
+            const mesh = new Mesh(geom, mat);
+            mesh.userData.originalMaterial = mat;
+            loaded.add(mesh);
+            tris = geom.index.count / 3;
+          } else {
+            // Point cloud
+            const mat = new PointsMaterial({
+              size: asset.pointSize ?? 0.015,
+              vertexColors: Boolean(geom.attributes.color),
+              color: geom.attributes.color ? 0xffffff : 0x38bdf8,
+              sizeAttenuation: true,
+            });
+            const points = new Points(geom, mat);
+            points.userData.originalMaterial = mat;
+            points.userData.isPointCloud = true;
+            loaded.add(points);
+            pts = geom.attributes.position.count;
+          }
+        } else {
+          // Standard GLTF/GLB binary
+          const gltf = await new GLTFLoader().parseAsync(buf, '');
+          if (cancelled) return;
+          loaded = gltf.scene;
+          loaded.traverse((o) => {
+            const m = o as Mesh;
+            if (!m.isMesh) return;
+            m.geometry.computeBoundsTree();
+            tris += (m.geometry.index?.count ?? m.geometry.getAttribute('position').count) / 3;
+            m.userData.originalMaterial = m.material;
+          });
+        }
+
         loaded.userData.scanId = asset.id;
         setRoot(loaded);
-        setStatus(`Loaded ${asset.fileName} – ${Math.round(tris).toLocaleString()} triangles`);
+
+        if (pts > 0) {
+          setStatus(`Loaded ${asset.fileName} – ${pts.toLocaleString()} points`);
+        } else {
+          setStatus(`Loaded ${asset.fileName} – ${Math.round(tris).toLocaleString()} triangles`);
+        }
         requestFrame();
         onLoaded();
       } catch (e) {
@@ -110,14 +179,16 @@ function ScanModel({ asset, blob, planes, onLoaded }: ScanModelProps) {
         setStatus(`Failed to load ${asset.fileName}: ${(e as Error).message}`);
       }
     })();
+
     return () => {
       cancelled = true;
       loaded?.traverse((o) => {
-        const m = o as Mesh;
-        if (!m.isMesh) return;
-        m.geometry.disposeBoundsTree();
-        m.geometry.dispose();
-        const mats = [m.userData.originalMaterial, m.userData.unlitMaterial].flat().filter(Boolean) as Material[];
+        const anyObj = o as any;
+        if (anyObj.geometry) {
+          if (anyObj.geometry.disposeBoundsTree) anyObj.geometry.disposeBoundsTree();
+          anyObj.geometry.dispose();
+        }
+        const mats = [o.userData.originalMaterial, o.userData.unlitMaterial].flat().filter(Boolean) as Material[];
         mats.forEach((mat) => {
           (mat as MeshStandardMaterial).map?.dispose();
           mat.dispose();
@@ -128,17 +199,33 @@ function ScanModel({ asset, blob, planes, onLoaded }: ScanModelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blob]);
 
-  // Apply display settings without reloading.
+  // Apply display settings (opacity, clipping, unlit, point size) without reloading.
   useEffect(() => {
     if (!root) return;
     root.traverse((o) => {
+      const anyObj = o as any;
+      if (anyObj.isPoints) {
+        const ptsMat = (anyObj.material as PointsMaterial);
+        ptsMat.size = asset.pointSize ?? 0.015;
+        const transparent = asset.opacity < 1;
+        ptsMat.transparent = transparent;
+        ptsMat.opacity = asset.opacity;
+        ptsMat.clippingPlanes = planes;
+        ptsMat.needsUpdate = true;
+        return;
+      }
+
       const m = o as Mesh;
       if (!m.isMesh) return;
       const orig = m.userData.originalMaterial as MeshStandardMaterial;
       let mat: Material = orig;
       if (asset.unlit) {
         if (!m.userData.unlitMaterial) {
-          m.userData.unlitMaterial = new MeshBasicMaterial({ map: orig.map, color: orig.map ? 0xffffff : orig.color });
+          m.userData.unlitMaterial = new MeshBasicMaterial({
+            map: orig?.map,
+            color: orig?.map ? 0xffffff : (orig?.color ?? 0xffffff),
+            vertexColors: orig?.vertexColors,
+          });
         }
         mat = m.userData.unlitMaterial as Material;
       }
@@ -152,8 +239,16 @@ function ScanModel({ asset, blob, planes, onLoaded }: ScanModelProps) {
       m.material = mat;
       m.renderOrder = transparent ? 1 : 0;
     });
-  }, [root, asset.unlit, asset.opacity, asset.doubleSided, planes]);
+  }, [root, asset.unlit, asset.opacity, asset.doubleSided, asset.pointSize, planes]);
 
   if (!root) return null;
-  return <primitive object={root} visible={asset.visible} />;
+
+  // Apply orientation: Z-up scans (LiDAR, CAD, iPhone PLY/LAS) rotate -90° around X to align with Three.js Y-up.
+  const rotX = asset.orientation === 'z-up' ? -Math.PI / 2 : 0;
+
+  return (
+    <group rotation={[rotX, 0, 0]} visible={asset.visible}>
+      <primitive object={root} />
+    </group>
+  );
 }

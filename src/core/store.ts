@@ -239,15 +239,22 @@ export const useApp = create<AppState>()((set, get) => ({
 
   addScan: (file, name) => {
     const id = uid('scan_');
+    const ext = name.split('.').pop()?.toLowerCase() || '';
+    const format: 'glb' | 'ply' | 'las' =
+      ext === 'ply' ? 'ply' : ext === 'las' || ext === 'laz' ? 'las' : 'glb';
+    const isZUp = format === 'las' || format === 'ply';
     const asset: ScanAsset = {
       id,
-      name: name.replace(/\.glb$/i, ''),
+      name: name.replace(/\.(glb|gltf|ply|las|laz)$/i, ''),
       fileName: name,
       byteSize: file.size,
       visible: true,
       opacity: 1,
       unlit: true,
       doubleSided: false,
+      format,
+      orientation: isZUp ? 'z-up' : 'y-up',
+      pointSize: 0.015,
     };
     set((s) => ({ scanFiles: { ...s.scanFiles, [id]: file } }));
     get().commit((d) => {

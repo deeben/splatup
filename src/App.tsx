@@ -60,10 +60,10 @@ export function App() {
                 <div className="welcome-actions">
                   <label className="welcome-btn primary">
                     <Icon name="import" size={20} />
-                    <span>Import GLB Scan</span>
+                    <span>Import 3D Scan (GLB, PLY, LAS)</span>
                     <input
                       type="file"
-                      accept=".glb"
+                      accept=".glb,.gltf,.ply,.las,.laz"
                       style={{ display: 'none' }}
                       onChange={(e) => {
                         const f = e.target.files?.[0];

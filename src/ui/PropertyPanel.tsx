@@ -1062,7 +1062,9 @@ export function PropertyPanel() {
       <aside className="panel-drawer right-drawer">
         <div className="panel-header">
           <div className="panel-title-row">
-            <span className="panel-badge scan-badge">SCAN</span>
+            <span className="panel-badge scan-badge">
+              {s.fileName.split('.').pop()?.toUpperCase() || 'SCAN'}
+            </span>
             <span className="panel-title-text">{s.name}</span>
           </div>
           <div className="panel-actions">
@@ -1085,6 +1087,16 @@ export function PropertyPanel() {
               <span className="info-val">{s.fileName}</span>
             </div>
             <div className="info-row">
+              <span>Type:</span>
+              <span className="info-val">
+                {s.fileName.toLowerCase().endsWith('.las') || s.fileName.toLowerCase().endsWith('.laz')
+                  ? 'ASPRS LiDAR Point Cloud'
+                  : s.fileName.toLowerCase().endsWith('.ply')
+                  ? 'PLY 3D Scan'
+                  : 'GLB Textured Mesh'}
+              </span>
+            </div>
+            <div className="info-row">
               <span>Size:</span>
               <span className="info-val">{fmtBytes(s.byteSize)}</span>
             </div>
@@ -1092,6 +1104,30 @@ export function PropertyPanel() {
 
           <div className="section-group">
             <div className="section-title">Display Settings</div>
+
+            <div className="field">
+              <span className="field-label">Coordinate Up-Axis</span>
+              <select
+                className="field-select"
+                value={s.orientation ?? (s.fileName.match(/\.(las|laz|ply)$/i) ? 'z-up' : 'y-up')}
+                onChange={(e) => updateScan(s.id, { orientation: e.target.value as 'y-up' | 'z-up' })}
+              >
+                <option value="z-up">Z-Up (CAD / LiDAR standard)</option>
+                <option value="y-up">Y-Up (GLTF / Blender standard)</option>
+              </select>
+            </div>
+
+            {(s.fileName.match(/\.(las|laz|ply)$/i) || s.pointSize != null) && (
+              <NumberField
+                label="Point Size"
+                value={Math.round((s.pointSize ?? 0.015) * 1000)}
+                suffix="mm"
+                min={1}
+                max={100}
+                onCommit={(v) => updateScan(s.id, { pointSize: v / 1000 })}
+              />
+            )}
+
             <label className="toggle-row">
               <span>Visible</span>
               <input
@@ -1116,26 +1152,30 @@ export function PropertyPanel() {
               />
             </label>
 
-            <label className="toggle-row" title="True Scaniverse vertex colours without 3D directional shading">
-              <div>
-                <div>Unlit Shader</div>
-                <div className="subtext">Original scan colours</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={s.unlit}
-                onChange={(e) => updateScan(s.id, { unlit: e.target.checked })}
-              />
-            </label>
+            {!s.fileName.match(/\.(las|laz)$/i) && (
+              <>
+                <label className="toggle-row" title="True scan vertex colours without 3D directional shading">
+                  <div>
+                    <div>Unlit Shader</div>
+                    <div className="subtext">Original scan colours</div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={s.unlit}
+                    onChange={(e) => updateScan(s.id, { unlit: e.target.checked })}
+                  />
+                </label>
 
-            <label className="toggle-row">
-              <span>Double Sided</span>
-              <input
-                type="checkbox"
-                checked={s.doubleSided}
-                onChange={(e) => updateScan(s.id, { doubleSided: e.target.checked })}
-              />
-            </label>
+                <label className="toggle-row">
+                  <span>Double Sided</span>
+                  <input
+                    type="checkbox"
+                    checked={s.doubleSided}
+                    onChange={(e) => updateScan(s.id, { doubleSided: e.target.checked })}
+                  />
+                </label>
+              </>
+            )}
           </div>
         </div>
       </aside>

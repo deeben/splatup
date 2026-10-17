@@ -1,6 +1,7 @@
 import {
   BufferGeometry,
   Mesh,
+  Points,
   Raycaster,
   Vector2,
   Vector3,
@@ -65,7 +66,7 @@ export function pick(
   ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
   raycaster.params.Line = { threshold: 0 };
-  raycaster.params.Points = { threshold: 0 };
+  raycaster.params.Points = { threshold: 0.035 };
   // With a section clip active we need all hits so we can skip the clipped ones.
   raycaster.firstHitOnly = clipY == null;
 
@@ -78,7 +79,9 @@ export function pick(
   hits.sort((a, b) => a.distance - b.distance);
 
   const hit = hits.find((h) => {
-    if (!(h.object as Mesh).isMesh || h.object.userData.noPick) return false;
+    const isMesh = (h.object as Mesh).isMesh;
+    const isPoints = (h.object as Points).isPoints;
+    if ((!isMesh && !isPoints) || h.object.userData.noPick) return false;
     if (!isVisible(h.object)) return false;
     const isDesign = !!findObjectId(h.object);
     if (!isDesign && clipY != null && h.point.y > clipY) return false;
@@ -87,10 +90,18 @@ export function pick(
   if (!hit) return null;
 
   const objectId = findObjectId(hit.object);
-  let kind: SnapKind = 'face';
+  const isPoints = (hit.object as Points).isPoints;
+  let kind: SnapKind = isPoints ? 'vertex' : 'face';
   const world = hit.point.clone();
 
-  if (vertexSnap) {
+  if (isPoints && hit.index != null) {
+    const geom = (hit.object as Points).geometry;
+    const pos = geom.getAttribute('position');
+    if (pos && hit.index < pos.count) {
+      world.fromBufferAttribute(pos, hit.index).applyMatrix4(hit.object.matrixWorld);
+      kind = 'vertex';
+    }
+  } else if (vertexSnap) {
     const candidates = objectId ? designSnapPoints(hit.object) : scanFaceVertices(hit);
     let best = SNAP_PX;
     const p0 = toScreen(hit.point, camera, rect);

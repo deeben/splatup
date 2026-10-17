@@ -48,11 +48,17 @@ export function DropOverlay() {
             console.error(err);
             setStatus(`Failed to open project: ${(err as Error).message}`);
           }
-        } else if (file.name.toLowerCase().endsWith('.glb')) {
+        } else if (
+          file.name.toLowerCase().endsWith('.glb') ||
+          file.name.toLowerCase().endsWith('.gltf') ||
+          file.name.toLowerCase().endsWith('.ply') ||
+          file.name.toLowerCase().endsWith('.las') ||
+          file.name.toLowerCase().endsWith('.laz')
+        ) {
           addScan(file, file.name);
           setStatus(`Importing scan ${file.name}…`);
         } else {
-          setStatus(`Unsupported file type: ${file.name} (use .glb or .splatup)`);
+          setStatus(`Unsupported file type: ${file.name} (use .glb, .ply, .las, or .splatup)`);
         }
       }
     };

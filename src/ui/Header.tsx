@@ -118,7 +118,7 @@ export function Header() {
         <input
           ref={fileInputRef}
           type="file"
-          accept=".glb"
+          accept=".glb,.gltf,.ply,.las,.laz"
           style={{ display: 'none' }}
           onChange={handleScanUpload}
         />
@@ -134,7 +134,7 @@ export function Header() {
           type="button"
           className="header-btn primary"
           onClick={() => fileInputRef.current?.click()}
-          title="Import GLB 3D scan exported from Scaniverse"
+          title="Import 3D scan (GLB mesh, PLY point cloud/mesh, or LAS LiDAR)"
         >
           <Icon name="import" size={16} />
           <span>Import Scan</span>

@@ -163,6 +163,12 @@ export interface ScanAsset {
   /** Show baked scan colours without scene lighting (recommended for Scaniverse). */
   unlit: boolean;
   doubleSided: boolean;
+  /** Scan file format */
+  format?: 'glb' | 'ply' | 'las';
+  /** Coordinate orientation: 'y-up' (GLB standard) or 'z-up' (LiDAR / CAD standard) */
+  orientation?: 'y-up' | 'z-up';
+  /** Point size for point cloud scans in metres (default 0.015 = 15mm) */
+  pointSize?: number;
 }
 
 export interface ViewSettings {
