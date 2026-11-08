@@ -72,6 +72,8 @@ interface AppState {
   updateObject: (id: string, recipe: (o: Draft<DesignObject>) => void) => void;
   /** Transient update during drag (does not push undo history) */
   updateObjectLive: (id: string, recipe: (o: Draft<DesignObject>) => void) => void;
+  /** Transient document change (slider drag etc.) that does not push undo history. */
+  updateDocLive: (recipe: (d: Draft<Project>) => void) => void;
   /** Commit undo history snapshot after dragging completes */
   commitChange: (snapshotBefore: Project) => void;
   duplicateObject: (id: string) => void;
@@ -381,6 +383,12 @@ export const useApp = create<AppState>()((set, get) => ({
     if (next !== prev) {
       set({ doc: next });
     }
+  },
+
+  updateDocLive: (recipe) => {
+    const prev = get().doc;
+    const next = produce(prev, recipe);
+    if (next !== prev) set({ doc: next });
   },
 
   commitChange: (snapshotBefore) => {

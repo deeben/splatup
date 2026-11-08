@@ -229,8 +229,13 @@ export function ViewController() {
 
       // Render at 1600x1200 for crisp drawing sheets
       const origSize = rGl.getSize(new Vector2());
+      const origPixelRatio = rGl.getPixelRatio();
       const targetW = 1600;
       const targetH = 1200;
+      // Force 1:1 pixels so the captured JPEG really is targetW×targetH. On
+      // HiDPI screens the pixel ratio is 2, which would double the image size
+      // and make it disagree with the dimensions written into the PDF.
+      rGl.setPixelRatio(1);
       rGl.setSize(targetW, targetH, false);
 
       const docMeasurements = useApp.getState().doc.measurements;
@@ -257,9 +262,10 @@ export function ViewController() {
             rGl.render(rScene, orthoCam);
           }
 
+          // Read pixels synchronously, straight after rendering, so the
+          // canvas does not need preserveDrawingBuffer.
           const dataUrl = rGl.domElement.toDataURL('image/jpeg', 0.95);
-          const res = await fetch(dataUrl);
-          const buf = await res.arrayBuffer();
+          const jpegBytes = dataUrlToBytes(dataUrl);
 
           // Calculate 2D projected dimensions for this elevation view using orthographic camera projection
           const projectedDimensions: ProjectedDimension[] = [];
@@ -303,7 +309,7 @@ export function ViewController() {
             title: v.title,
             subTitle: v.subTitle,
             dataUrl,
-            jpegBytes: new Uint8Array(buf),
+            jpegBytes,
             width: targetW,
             height: targetH,
             projectedDimensions,
@@ -326,6 +332,7 @@ export function ViewController() {
         rCam.updateProjectionMatrix();
         if (controls) controls.update();
 
+        rGl.setPixelRatio(origPixelRatio);
         rGl.setSize(origSize.x, origSize.y, false);
         rGl.render(rScene, rCam);
       }
@@ -442,4 +449,11 @@ export function ViewController() {
   }, [viewRequest, frontViewAngle, camera, controls]);
 
   return null;
+}
+
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const bin = atob(dataUrl.slice(dataUrl.indexOf(',') + 1));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }

@@ -22,7 +22,7 @@ export function Viewport() {
       flat // no tone mapping: keep Scaniverse's baked colours faithful
       dpr={[1, 2]}
       camera={{ position: [4, 3, 5], fov: 50, near: 0.01, far: 500 }}
-      gl={{ antialias: true, preserveDrawingBuffer: true }}
+      gl={{ antialias: true }}
       onCreated={({ gl }) => {
         gl.localClippingEnabled = true;
       }}

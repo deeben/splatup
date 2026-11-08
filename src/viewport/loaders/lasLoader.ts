@@ -40,7 +40,16 @@ export function parseLas(arrayBuffer: ArrayBuffer): LasParseResult {
   const vMajor = view.getUint8(24);
   const vMinor = view.getUint8(25);
   const offsetToPoints = view.getUint32(96, true);
-  const pointFormat = view.getUint8(104);
+  const rawPointFormat = view.getUint8(104);
+  // LAZ (LASzip) files keep the LAS header but set bit 7 (and often bit 6) of
+  // the point format to mark the point data as compressed. Reading it as raw
+  // LAS would silently produce a garbage cloud, so refuse it clearly instead.
+  if (rawPointFormat & 0xc0) {
+    throw new Error(
+      'This is a compressed LAZ file, which SplatUp cannot read yet. Export or convert it to uncompressed .las and import that.',
+    );
+  }
+  const pointFormat = rawPointFormat;
   const pointRecordLength = view.getUint16(105, true);
   const numPointsLegacy = view.getUint32(107, true);
 
@@ -71,8 +80,8 @@ export function parseLas(arrayBuffer: ArrayBuffer): LasParseResult {
   // Format 7, 8: 36/38 bytes (record 6 + RGB at offset 30)
   let rgbOffset = -1;
   if (pointFormat === 2) rgbOffset = 20;
-  else if (pointFormat === 3) rgbOffset = 28;
-  else if (pointFormat === 7 || pointFormat === 8) rgbOffset = 30;
+  else if (pointFormat === 3 || pointFormat === 5) rgbOffset = 28;
+  else if (pointFormat === 7 || pointFormat === 8 || pointFormat === 10) rgbOffset = 30;
 
   const positions = new Float32Array(numPoints * 3);
   const colors = rgbOffset >= 0 ? new Float32Array(numPoints * 3) : null;

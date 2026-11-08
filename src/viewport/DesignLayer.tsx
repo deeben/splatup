@@ -359,6 +359,16 @@ function Gizmo({ id }: { id: string }) {
     const o = target;
     const position = worldToUser(o.position).map((v) => Math.round(v * 10) / 10) as [number, number, number];
     const rotation = eulerToUserRot(o.rotation);
+    // A click on the gizmo without dragging fires mouseUp too; don't record
+    // an undo step when nothing actually moved.
+    const cur = useApp.getState().doc.objects.find((x) => x.id === id);
+    if (
+      cur &&
+      position.every((v, i) => Math.abs(v - cur.transform.position[i]) < 0.05) &&
+      rotation.every((v, i) => Math.abs(v - cur.transform.rotation[i]) < 0.001)
+    ) {
+      return;
+    }
     useApp.getState().updateObject(id, (d) => {
       d.transform.position = position;
       d.transform.rotation = rotation;

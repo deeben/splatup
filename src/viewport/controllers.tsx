@@ -176,7 +176,8 @@ export function ToolController() {
             const pitchRad = Math.atan2(dz, Math.hypot(dx, dy));
             const pitchDeg = Math.round(((pitchRad * 180) / Math.PI) * 10) / 10;
             const id = st.addObject('beam', p1.map((v) => Math.round(v)) as typeof p1);
-            st.updateObject(id, (o) => {
+            // Folded into the same undo step as the add (no history entry).
+            st.updateObjectLive(id, (o) => {
               const bo = o as SteelBeamObject;
               bo.length = Math.max(100, len);
               bo.transform.rotation = [0, -pitchDeg, yawDeg];
@@ -210,7 +211,8 @@ export function ToolController() {
             const going = Math.round(horizDist / numSteps);
 
             const id = st.addObject('stairs', bottom.map((v) => Math.round(v)) as typeof bottom);
-            st.updateObject(id, (o) => {
+            // Folded into the same undo step as the add (no history entry).
+            st.updateObjectLive(id, (o) => {
               const so = o as StairsObject;
               so.totalRise = dz;
               so.going = Math.max(200, going);

@@ -1,5 +1,8 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { Draft } from 'immer';
 import { evalExpr, fmtNum } from '../core/units';
+import { useApp } from '../core/store';
+import type { Project } from '../core/types';
 
 interface NumberFieldProps {
   label: ReactNode;
@@ -86,5 +89,54 @@ export function TextField({ label, value, onCommit }: { label: string; value: st
         />
       </span>
     </label>
+  );
+}
+
+/**
+ * Range slider that updates the document live while dragging but records a
+ * single undo step when the drag (or keyboard nudge) ends.
+ */
+export function LiveRange({
+  value,
+  min,
+  max,
+  step,
+  className,
+  apply,
+}: {
+  value: number;
+  min: number | string;
+  max: number | string;
+  step: number | string;
+  className?: string;
+  /** Write the new value into the draft document. */
+  apply: (d: Draft<Project>, v: number) => void;
+}) {
+  const snapshot = useRef<Project | null>(null);
+
+  const finish = () => {
+    if (snapshot.current) {
+      useApp.getState().commitChange(snapshot.current);
+      snapshot.current = null;
+    }
+  };
+
+  return (
+    <input
+      type="range"
+      className={className}
+      min={min}
+      max={max}
+      step={step}
+      value={value}
+      onChange={(e) => {
+        const v = parseFloat(e.target.value);
+        if (!snapshot.current) snapshot.current = useApp.getState().doc;
+        useApp.getState().updateDocLive((d) => apply(d, v));
+      }}
+      onPointerUp={finish}
+      onKeyUp={finish}
+      onBlur={finish}
+    />
   );
 }
