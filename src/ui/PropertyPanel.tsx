@@ -1,5 +1,5 @@
 import { useApp } from '../core/store';
-import { NumberField, TextField } from './fields';
+import { LiveRange, NumberField, TextField } from './fields';
 import { fmtBytes, fmtMm, measureParts } from '../core/units';
 import { Icon } from './Icon';
 import type {
@@ -364,17 +364,15 @@ export function PropertyPanel() {
                       <span>Swing Angle</span>
                       <span>{Math.round(go.swingAngle)}°</span>
                     </div>
-                    <input
-                      type="range"
+                    <LiveRange
                       min="0"
                       max="90"
                       step="5"
                       value={go.swingAngle}
-                      onChange={(e) =>
-                        updateObject(obj.id, (o) => {
-                          (o as SwingGateObject).swingAngle = parseFloat(e.target.value);
-                        })
-                      }
+                      apply={(d, v) => {
+                        const o = d.objects.find((x) => x.id === obj.id);
+                        if (o) (o as SwingGateObject).swingAngle = v;
+                      }}
                     />
                   </label>
 
@@ -1196,13 +1194,15 @@ export function PropertyPanel() {
                 <span>Opacity</span>
                 <span>{Math.round(s.opacity * 100)}%</span>
               </div>
-              <input
-                type="range"
+              <LiveRange
                 min="0.05"
                 max="1"
                 step="0.05"
                 value={s.opacity}
-                onChange={(e) => updateScan(s.id, { opacity: parseFloat(e.target.value) })}
+                apply={(d, v) => {
+                  const sc = d.scans.find((x) => x.id === s.id);
+                  if (sc) sc.opacity = v;
+                }}
               />
             </label>
 
@@ -1501,18 +1501,14 @@ export function PropertyPanel() {
                   })
                 }
               />
-              <input
-                type="range"
+              <LiveRange
                 className="section-slider"
                 min={minZ}
                 max={maxZ}
                 step="50"
                 value={clipHeight}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  commit((d) => {
-                    d.view.clipHeight = val;
-                  });
+                apply={(d, v) => {
+                  d.view.clipHeight = v;
                 }}
               />
             </>

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Euler,
   Group,
@@ -94,7 +94,37 @@ function SingleHandle({
   const [liveDeltaMm, setLiveDeltaMm] = useState(0);
 
   const isDraggingRef = useRef(false);
+  const isHoveredRef = useRef(false);
+  /** Removes the window drag listeners; set while a drag is in progress. */
+  const stopDragRef = useRef<(() => void) | null>(null);
   const handleMeshRef = useRef<Group>(null);
+
+  // If this handle disappears while hovered or mid-drag (object deleted,
+  // undo, selection change), pointer-out never fires. Release the global
+  // flags here, otherwise orbit stays disabled and viewport clicks are ignored.
+  useEffect(() => {
+    return () => {
+      if (stopDragRef.current) {
+        stopDragRef.current();
+        stopDragRef.current = null;
+        // Keep the partial drag undoable.
+        if (initialDocRef.current) useApp.getState().commitChange(initialDocRef.current);
+        initialDocRef.current = null;
+      }
+      if (isHoveredRef.current || isDraggingRef.current) {
+        isHoveredRef.current = false;
+        isDraggingRef.current = false;
+        registry.isHoveringHandle = false;
+        registry.activeHandleDragging = false;
+        if (registry.controls) registry.controls.enabled = true;
+        if (registry.transformControls) {
+          registry.transformControls.visible = true;
+          (registry.transformControls as any).enabled = true;
+        }
+        document.body.style.cursor = 'default';
+      }
+    };
+  }, []);
   const initialDocRef = useRef<Project | null>(null);
   const dragStartDataRef = useRef<{
     handleWorldPos: Vector3;
@@ -116,6 +146,7 @@ function SingleHandle({
   const handlePointerOver = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     setHovered(true);
+    isHoveredRef.current = true;
     registry.isHoveringHandle = true;
     if (registry.controls) registry.controls.enabled = false;
     document.body.style.cursor = 'grab';
@@ -124,6 +155,7 @@ function SingleHandle({
   const handlePointerOut = (e: ThreeEvent<PointerEvent>) => {
     e.stopPropagation();
     setHovered(false);
+    isHoveredRef.current = false;
     if (!isDraggingRef.current) {
       registry.isHoveringHandle = false;
       if (registry.controls) registry.controls.enabled = true;
@@ -228,6 +260,7 @@ function SingleHandle({
     const onPointerUp = () => {
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
+      stopDragRef.current = null;
 
       isDraggingRef.current = false;
       registry.activeHandleDragging = false;
@@ -252,6 +285,10 @@ function SingleHandle({
 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+    stopDragRef.current = () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    };
   };
 
   const currentVal = handle.getVal(obj);

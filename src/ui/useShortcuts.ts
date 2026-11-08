@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useApp } from '../core/store';
+import { exportProjectFile } from '../core/persist';
 
 export function useShortcuts() {
   const tool = useApp((s) => s.tool);
@@ -31,6 +32,7 @@ export function useShortcuts() {
       if (
         target.tagName === 'INPUT' ||
         target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
         target.isContentEditable
       ) {
         return;
@@ -58,6 +60,20 @@ export function useShortcuts() {
         }
         return;
       }
+
+      if (mod && e.key.toLowerCase() === 's') {
+        // Save the project instead of the browser's "Save page" dialog.
+        e.preventDefault();
+        exportProjectFile().catch((err) => {
+          console.error(err);
+          useApp.getState().setStatus(`Failed to save project: ${(err as Error).message}`);
+        });
+        return;
+      }
+
+      // Single-key tool shortcuts must not fire alongside Cmd/Ctrl/Alt
+      // (e.g. Cmd+C copy, Cmd+A select-all, Cmd+R reload).
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       switch (e.key.toLowerCase()) {
         case 'v':

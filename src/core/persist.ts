@@ -4,7 +4,7 @@ import { useApp } from './store';
 import type { Project } from './types';
 import { generateElevationsPdf } from './pdf';
 import { registry } from '../viewport/registry';
-import { GLTFExporter } from 'three-stdlib';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import type { Mesh, MeshStandardMaterial, Object3D } from 'three';
 
 /**
@@ -29,7 +29,11 @@ export async function restoreAutosave(): Promise<boolean> {
   const files: Record<string, Blob> = {};
   for (const s of doc.scans) {
     const b = await get<Blob>(scanKey(s.id));
-    if (b) files[s.id] = b;
+    if (b) {
+      files[s.id] = b;
+      // Already in IndexedDB: don't rewrite (possibly 100 MB+) on the next save.
+      savedBlobs.add(s.id);
+    }
   }
   const models: Record<string, Blob> = {};
   for (const id of modelAssetIds(doc)) {
@@ -44,15 +48,30 @@ export async function restoreAutosave(): Promise<boolean> {
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
+let saving: Promise<void> = Promise.resolve();
 const savedBlobs = new Set<string>();
 const savedModels = new Set<string>();
+let persistRequested = false;
+
+/**
+ * Ask the browser not to evict our storage under disk pressure. Only asked
+ * once a scan or model is stored, since that is when losing the autosave would hurt.
+ */
+function requestPersistentStorage() {
+  if (persistRequested) return;
+  persistRequested = true;
+  navigator.storage?.persist?.().catch(() => {});
+}
 
 /** Subscribe to document changes and autosave (debounced). */
 export function startAutosave() {
   return useApp.subscribe((s, prev) => {
     if (s.doc === prev.doc && s.scanFiles === prev.scanFiles && s.modelFiles === prev.modelFiles) return;
     clearTimeout(timer);
-    timer = setTimeout(() => void saveNow(), 600);
+    // Chain saves so two slow saves never interleave their IndexedDB writes.
+    timer = setTimeout(() => {
+      saving = saving.then(saveNow).catch((e) => console.warn('Autosave failed:', e));
+    }, 600);
   });
 }
 
@@ -63,11 +82,13 @@ async function saveNow() {
     if (savedModels.has(id)) continue;
     await set(modelKey(id), blob);
     savedModels.add(id);
+    requestPersistentStorage();
   }
   for (const [id, blob] of Object.entries(scanFiles)) {
     if (savedBlobs.has(id)) continue;
     await set(scanKey(id), blob);
     savedBlobs.add(id);
+    requestPersistentStorage();
   }
   // Garbage-collect blobs no longer referenced (and not in undo history).
   const { past, future } = useApp.getState();
