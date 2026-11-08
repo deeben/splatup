@@ -15,11 +15,13 @@ export function Header() {
   const doc = useApp((s) => s.doc);
   const commit = useApp((s) => s.commit);
   const addScan = useApp((s) => s.addScan);
+  const addModel = useApp((s) => s.addModel);
   const setStatus = useApp((s) => s.setStatus);
   const resetProject = useApp((s) => s.resetProject);
 
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const objectInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
   const exportMenuRef = useRef<HTMLDivElement>(null);
 
@@ -40,6 +42,20 @@ export function Header() {
     if (!file) return;
     addScan(file, file.name);
     e.target.value = '';
+  };
+
+  const handleObjectUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      setStatus(`Importing ${file.name}…`);
+      await addModel(file, file.name);
+      setStatus(`Imported ${file.name} · check units in the panel on the right, then move/rotate with W / E`);
+    } catch (err) {
+      console.error(err);
+      setStatus(`Failed to import ${file.name}: ${(err as Error).message}`);
+    }
   };
 
   const handleProjectOpen = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,12 +139,29 @@ export function Header() {
           onChange={handleScanUpload}
         />
         <input
+          ref={objectInputRef}
+          type="file"
+          accept=".glb,.gltf,.stl"
+          style={{ display: 'none' }}
+          onChange={handleObjectUpload}
+        />
+        <input
           ref={projectInputRef}
           type="file"
           accept=".splatup,.zip"
           style={{ display: 'none' }}
           onChange={handleProjectOpen}
         />
+
+        <button
+          type="button"
+          className="header-btn"
+          onClick={() => objectInputRef.current?.click()}
+          title="Import a 3D object (GLB or STL) that you can move and rotate like a primitive"
+        >
+          <Icon name="cube" size={16} />
+          <span>Import Object</span>
+        </button>
 
         <button
           type="button"

@@ -969,6 +969,10 @@ export async function generateElevationsPdf(
       typeStr = 'SWING GATE (AS 1657)';
       dimsStr = `W = ${go.width} mm · H = ${go.height} mm`;
       specStr = `Self-Closing Gate · ${go.hasKickplate ? 'With Kickplate' : 'Open'}`;
+    } else if (o.kind === 'model') {
+      typeStr = `IMPORTED (${o.format.toUpperCase()})`;
+      dimsStr = `${o.size[0]} x ${o.size[1]} x ${o.size[2]} mm`;
+      specStr = o.fileName;
     }
 
     pdf.drawText(String(itemIndex), cols[0].x, rowY + 3.5, { font: 'regular', size: 7 });

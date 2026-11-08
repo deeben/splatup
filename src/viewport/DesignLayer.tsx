@@ -19,6 +19,7 @@ import type {
   CylinderObject,
   DesignObject,
   HandrailObject,
+  ImportedModelObject,
   LadderObject,
   PolyShapeObject,
   StairsObject,
@@ -30,6 +31,7 @@ import { buildAccessLadder, buildMonowillsHandrail, buildSwingGate } from './geo
 import { buildStairsGeometry } from './geometry/stairs';
 import { buildSteelBeamGeometry } from './geometry/steelSections';
 import { PullHandles } from './PullHandles';
+import { loadModelGeometry, modelSnapPoints, placeModelGeometry } from './loaders/modelLoader';
 
 export function DesignLayer() {
   const objects = useApp((s) => s.doc.objects);
@@ -49,9 +51,13 @@ export function DesignLayer() {
   return (
     <>
       <group ref={groupRef} name="design">
-        {objects.map((o) => (
-          <DesignObjectView key={o.id} obj={o} selected={o.id === selectedId} />
-        ))}
+        {objects.map((o) =>
+          o.kind === 'model' ? (
+            <ImportedModelView key={o.id} obj={o} selected={o.id === selectedId} />
+          ) : (
+            <DesignObjectView key={o.id} obj={o} selected={o.id === selectedId} />
+          ),
+        )}
       </group>
       {selectedId && <Gizmo id={selectedId} />}
       {selectedObj && <PullHandles obj={selectedObj} />}
@@ -83,20 +89,82 @@ function MeshEdges({
 }
 
 function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: boolean }) {
+  const shape = useMemo(() => shapeFor(obj), [obj]);
+
+  useEffect(() => {
+    return () => {
+      shape.geometry.dispose();
+    };
+  }, [shape.geometry]);
+
+  return <ShapeView obj={obj} selected={selected} {...shape} />;
+}
+
+/**
+ * Imported GLB/STL object. The file is parsed once per asset (async), then
+ * placed in the scene frame whenever units / up-axis / scale change. Rendering,
+ * picking, snapping and the transform gizmo are shared with the primitives.
+ */
+function ImportedModelView({ obj, selected }: { obj: ImportedModelObject; selected: boolean }) {
+  const blob = useApp((s) => s.modelFiles[obj.assetId]);
+  const [raw, setRaw] = useState<BufferGeometry | null>(null);
+
+  useEffect(() => {
+    if (!blob) return;
+    let cancelled = false;
+    loadModelGeometry(obj.assetId, blob, obj.format)
+      .then((g) => !cancelled && setRaw(g))
+      .catch((e) => {
+        console.error(e);
+        useApp.getState().setStatus(`Failed to load ${obj.fileName}: ${(e as Error).message}`);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [blob, obj.assetId, obj.format, obj.fileName]);
+
+  const shape = useMemo(() => {
+    if (!raw) return null;
+    const { geometry } = placeModelGeometry(raw, obj.sourceUnits, obj.upAxis, obj.scale);
+    geometry.computeBoundsTree();
+    return { geometry, offsetY: 0, snapPoints: modelSnapPoints(geometry), showEdges: true };
+  }, [raw, obj.sourceUnits, obj.upAxis, obj.scale]);
+
+  useEffect(() => {
+    if (!shape) return;
+    return () => {
+      shape.geometry.disposeBoundsTree();
+      shape.geometry.dispose();
+    };
+  }, [shape]);
+
+  // Always render the group (even while loading) so the gizmo can attach to it straight away.
+  return <ShapeView obj={obj} selected={selected} {...(shape ?? EMPTY_SHAPE)} />;
+}
+
+const EMPTY_SHAPE = { geometry: null, offsetY: 0, snapPoints: [], showEdges: false };
+
+function ShapeView({
+  obj,
+  selected,
+  geometry,
+  offsetY,
+  snapPoints,
+  showEdges,
+}: {
+  obj: DesignObject;
+  selected: boolean;
+  geometry: BufferGeometry | null;
+  offsetY: number;
+  snapPoints: [number, number, number][];
+  showEdges: boolean;
+}) {
   const position = userToWorldTuple(obj.transform.position);
   const rotation = useMemo(() => userRotToEuler(obj.transform.rotation), [obj.transform.rotation]);
   const edgeColor = useMemo(
     () => (selected ? '#ffffff' : new Color(obj.color).multiplyScalar(0.55).getStyle()),
     [obj.color, selected],
   );
-
-  const { geometry, offsetY, snapPoints, showEdges } = useMemo(() => shapeFor(obj), [obj]);
-
-  useEffect(() => {
-    return () => {
-      geometry.dispose();
-    };
-  }, [geometry]);
 
   return (
     <group
@@ -106,6 +174,7 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
       visible={obj.visible}
       userData={{ objectId: obj.id, snapPoints }}
     >
+      {geometry && (
       <mesh
         geometry={geometry}
         position={[0, offsetY, 0]}
@@ -123,12 +192,18 @@ function DesignObjectView({ obj, selected }: { obj: DesignObject; selected: bool
         />
         {showEdges && <MeshEdges geometry={geometry} color={edgeColor} threshold={20} />}
       </mesh>
+      )}
     </group>
   );
 }
 
 /** Geometry (metres, three frame) + snap points in group-local coordinates. */
-function shapeFor(obj: DesignObject) {
+function shapeFor(obj: DesignObject): {
+  geometry: BufferGeometry;
+  offsetY: number;
+  snapPoints: [number, number, number][];
+  showEdges: boolean;
+} {
   if (obj.kind === 'box') {
     const o = obj as BoxObject;
     const L = mm(o.length);

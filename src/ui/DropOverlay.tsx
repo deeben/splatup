@@ -6,6 +6,7 @@ import { Icon } from './Icon';
 export function DropOverlay() {
   const [isDragging, setIsDragging] = useState(false);
   const addScan = useApp((s) => s.addScan);
+  const addModel = useApp((s) => s.addModel);
   const setStatus = useApp((s) => s.setStatus);
 
   useEffect(() => {
@@ -48,6 +49,16 @@ export function DropOverlay() {
             console.error(err);
             setStatus(`Failed to open project: ${(err as Error).message}`);
           }
+        } else if (file.name.toLowerCase().endsWith('.stl')) {
+          // STL is never a scan format, so treat it as an imported object.
+          try {
+            setStatus(`Importing object ${file.name}…`);
+            await addModel(file, file.name);
+            setStatus(`Imported ${file.name}`);
+          } catch (err) {
+            console.error(err);
+            setStatus(`Failed to import ${file.name}: ${(err as Error).message}`);
+          }
         } else if (
           file.name.toLowerCase().endsWith('.glb') ||
           file.name.toLowerCase().endsWith('.gltf') ||
@@ -58,7 +69,7 @@ export function DropOverlay() {
           addScan(file, file.name);
           setStatus(`Importing scan ${file.name}…`);
         } else {
-          setStatus(`Unsupported file type: ${file.name} (use .glb, .ply, .las, or .splatup)`);
+          setStatus(`Unsupported file type: ${file.name} (use .glb, .ply, .las, .stl, or .splatup)`);
         }
       }
     };
@@ -74,7 +85,7 @@ export function DropOverlay() {
       window.removeEventListener('dragover', onDragOver);
       window.removeEventListener('drop', onDrop);
     };
-  }, [addScan, setStatus]);
+  }, [addScan, addModel, setStatus]);
 
   if (!isDragging) return null;
 

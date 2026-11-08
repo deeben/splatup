@@ -10,12 +10,18 @@ import type { Mesh, MeshStandardMaterial, Object3D } from 'three';
 /**
  * Local-first persistence.
  *  - Autosave: project JSON + scan blobs in IndexedDB (survives reloads, works offline).
- *  - Files: `.splatup` = zip { project.json, scans/<id>.glb } via File System Access API
+ *  - Files: `.splatup` = zip { project.json, scans/<id>.<ext>, models/<assetId>.<ext> } via File System Access API
  *    where available, falling back to a download.
  */
 
 const DOC_KEY = 'splatup:doc';
 const scanKey = (id: string) => `splatup:scan:${id}`;
+const modelKey = (id: string) => `splatup:model:${id}`;
+
+/** Asset ids of imported GLB/STL objects referenced by a document. */
+function modelAssetIds(doc: Project): string[] {
+  return [...new Set(doc.objects.flatMap((o) => (o.kind === 'model' ? [o.assetId] : [])))];
+}
 
 export async function restoreAutosave(): Promise<boolean> {
   const doc = await get<Project>(DOC_KEY);
@@ -25,25 +31,39 @@ export async function restoreAutosave(): Promise<boolean> {
     const b = await get<Blob>(scanKey(s.id));
     if (b) files[s.id] = b;
   }
-  useApp.getState().loadProject(doc, files);
+  const models: Record<string, Blob> = {};
+  for (const id of modelAssetIds(doc)) {
+    const b = await get<Blob>(modelKey(id));
+    if (b) {
+      models[id] = b;
+      savedModels.add(id); // already in IndexedDB; don't rewrite it on the next autosave
+    }
+  }
+  useApp.getState().loadProject(doc, files, models);
   return true;
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined;
 const savedBlobs = new Set<string>();
+const savedModels = new Set<string>();
 
 /** Subscribe to document changes and autosave (debounced). */
 export function startAutosave() {
   return useApp.subscribe((s, prev) => {
-    if (s.doc === prev.doc && s.scanFiles === prev.scanFiles) return;
+    if (s.doc === prev.doc && s.scanFiles === prev.scanFiles && s.modelFiles === prev.modelFiles) return;
     clearTimeout(timer);
     timer = setTimeout(() => void saveNow(), 600);
   });
 }
 
 async function saveNow() {
-  const { doc, scanFiles } = useApp.getState();
+  const { doc, scanFiles, modelFiles } = useApp.getState();
   await set(DOC_KEY, doc);
+  for (const [id, blob] of Object.entries(modelFiles)) {
+    if (savedModels.has(id)) continue;
+    await set(modelKey(id), blob);
+    savedModels.add(id);
+  }
   for (const [id, blob] of Object.entries(scanFiles)) {
     if (savedBlobs.has(id)) continue;
     await set(scanKey(id), blob);
@@ -51,9 +71,16 @@ async function saveNow() {
   }
   // Garbage-collect blobs no longer referenced (and not in undo history).
   const { past, future } = useApp.getState();
-  const live = new Set([doc, ...past, ...future].flatMap((d) => d.scans.map((s) => s.id)));
+  const history = [doc, ...past, ...future];
+  const live = new Set(history.flatMap((d) => d.scans.map((s) => s.id)));
+  const liveModels = new Set(history.flatMap(modelAssetIds));
   for (const k of await keys()) {
     const ks = String(k);
+    if (ks.startsWith('splatup:model:') && !liveModels.has(ks.slice('splatup:model:'.length))) {
+      await del(k);
+      savedModels.delete(ks.slice('splatup:model:'.length));
+      continue;
+    }
     if (ks.startsWith('splatup:scan:') && !live.has(ks.slice('splatup:scan:'.length))) {
       await del(k);
       savedBlobs.delete(ks.slice('splatup:scan:'.length));
@@ -64,12 +91,13 @@ async function saveNow() {
 export async function clearAutosave() {
   for (const k of await keys()) if (String(k).startsWith('splatup:')) await del(k);
   savedBlobs.clear();
+  savedModels.clear();
 }
 
 // ---------------------------------------------------------------- .splatup files
 
 export async function exportProjectFile() {
-  const { doc, scanFiles } = useApp.getState();
+  const { doc, scanFiles, modelFiles } = useApp.getState();
   const entries: Zippable = {
     'project.json': strToU8(JSON.stringify(doc, null, 2)),
   };
@@ -79,6 +107,12 @@ export async function exportProjectFile() {
       const ext = s.fileName.split('.').pop()?.toLowerCase() || 'glb';
       entries[`scans/${s.id}.${ext}`] = [new Uint8Array(await blob.arrayBuffer()), { level: 0 }];
     }
+  }
+  for (const o of doc.objects) {
+    if (o.kind !== 'model') continue;
+    const path = `models/${o.assetId}.${o.format}`;
+    const blob = modelFiles[o.assetId];
+    if (blob && !entries[path]) entries[path] = [new Uint8Array(await blob.arrayBuffer()), { level: 6 }];
   }
   const zipped = zipSync(entries, { level: 6 });
   const blob = new Blob([zipped as BlobPart], { type: 'application/zip' });
@@ -102,8 +136,15 @@ export async function importProjectFile(file: Blob) {
       zip[`scans/${s.fileName}`];
     if (data) files[s.id] = new Blob([data as BlobPart]);
   }
+  const models: Record<string, Blob> = {};
+  for (const o of doc.objects) {
+    if (o.kind !== 'model') continue;
+    const data = zip[`models/${o.assetId}.${o.format}`];
+    if (data) models[o.assetId] = new Blob([data as BlobPart]);
+  }
   savedBlobs.clear();
-  useApp.getState().loadProject(doc, files);
+  savedModels.clear();
+  useApp.getState().loadProject(doc, files, models);
 }
 
 export async function exportMeasurementsCsv() {
@@ -135,6 +176,7 @@ export async function exportMeasurementsCsv() {
     else if (o.kind === 'ladder') dims = [o.width, '', o.height];
     else if (o.kind === 'stairs') dims = [o.width, o.numSteps * o.going, o.totalRise];
     else if (o.kind === 'beam') dims = [o.length, o.sectionName, o.alignment];
+    else if (o.kind === 'model') dims = [...o.size];
 
     rows.push([o.name, o.kind, ...dims, ...o.transform.position, ...o.transform.rotation].map((v) =>
       typeof v === 'number' ? v.toFixed(1) : `"${String(v).replace(/"/g, '""')}"`,
