@@ -7,6 +7,8 @@ import type {
   CylinderObject,
   HandrailObject,
   LadderObject,
+  ModelUnits,
+  ModelUpAxis,
   PolyShapeObject,
   StairsObject,
   SteelBeamObject,
@@ -34,6 +36,7 @@ export function PropertyPanel() {
   const deleteSelection = useApp((s) => s.deleteSelection);
   const duplicateObject = useApp((s) => s.duplicateObject);
   const updateObject = useApp((s) => s.updateObject);
+  const updateModel = useApp((s) => s.updateModel);
   const updateScan = useApp((s) => s.updateScan);
   const renameMeasurement = useApp((s) => s.renameMeasurement);
   const commit = useApp((s) => s.commit);
@@ -843,6 +846,57 @@ export function PropertyPanel() {
                 </>
               );
             })()}
+
+            {obj.kind === 'model' && (
+              <>
+                <div className="info-row">
+                  <span>File:</span>
+                  <span className="info-val" title={obj.fileName}>{obj.fileName}</span>
+                </div>
+                <div className="info-row" style={{ marginBottom: 8 }}>
+                  <span>Size (L × W × H):</span>
+                  <span className="info-val">
+                    {obj.size[0]} × {obj.size[1]} × {obj.size[2]}
+                  </span>
+                </div>
+
+                <div className="field" title="Units the file was modelled in. Auto-detected on import; change it if the object looks 10×, 100× or 1000× off.">
+                  <span className="field-label">File Units</span>
+                  <select
+                    className="field-select"
+                    value={obj.sourceUnits}
+                    onChange={(e) => void updateModel(obj.id, { sourceUnits: e.target.value as ModelUnits })}
+                  >
+                    <option value="mm">Millimetres (mm)</option>
+                    <option value="cm">Centimetres (cm)</option>
+                    <option value="m">Metres (m)</option>
+                    <option value="in">Inches (in)</option>
+                    <option value="ft">Feet (ft)</option>
+                  </select>
+                </div>
+
+                <div className="field" title="Which axis points up in the file. GLB is normally Y-up; STL is normally Z-up.">
+                  <span className="field-label">Up Axis</span>
+                  <select
+                    className="field-select"
+                    value={obj.upAxis}
+                    onChange={(e) => void updateModel(obj.id, { upAxis: e.target.value as ModelUpAxis })}
+                  >
+                    <option value="y">Y-up (GLB standard)</option>
+                    <option value="z">Z-up (CAD / STL)</option>
+                  </select>
+                </div>
+
+                <NumberField
+                  label="Scale"
+                  value={obj.scale}
+                  suffix="×"
+                  min={0.0001}
+                  title="Extra uniform scale on top of the unit conversion (1 = true size)"
+                  onCommit={(v) => void updateModel(obj.id, { scale: v })}
+                />
+              </>
+            )}
           </div>
 
           {/* Position Section */}

@@ -6,6 +6,7 @@ import {
   type DesignKind,
   type DesignObject,
   type HandrailObject,
+  type ImportedModelObject,
   type Measurement,
   type PolyShapeObject,
   type Project,
@@ -18,6 +19,13 @@ import {
   type ViewRequest,
 } from './types';
 import { uid } from './units';
+import {
+  defaultUpAxis,
+  guessUnits,
+  loadModelGeometry,
+  modelFormatFor,
+  placeModelGeometry,
+} from '../viewport/loaders/modelLoader';
 
 const HISTORY_LIMIT = 200;
 
@@ -31,6 +39,8 @@ interface AppState {
 
   /** Raw GLB blobs keyed by scan id (not part of the JSON document). */
   scanFiles: Record<string, Blob>;
+  /** Raw GLB/STL blobs for imported objects, keyed by asset id (not part of the JSON document). */
+  modelFiles: Record<string, Blob>;
 
   tool: Tool;
   selection: Selection;
@@ -54,7 +64,11 @@ interface AppState {
   updateScan: (id: string, patch: Partial<ScanAsset>) => void;
   removeScan: (id: string) => void;
 
-  addObject: (kind: DesignKind, at: Vec3) => string;
+  addObject: (kind: PrimitiveKind, at: Vec3) => string;
+  /** Import a GLB/STL file as a movable design object. Resolves to the new object id. */
+  addModel: (file: File | Blob, name: string) => Promise<string>;
+  /** Change an imported object's units / up axis / scale and refresh its stored size (one undo step). */
+  updateModel: (id: string, patch: Partial<Pick<ImportedModelObject, 'sourceUnits' | 'upAxis' | 'scale'>>) => Promise<void>;
   updateObject: (id: string, recipe: (o: Draft<DesignObject>) => void) => void;
   /** Transient update during drag (does not push undo history) */
   updateObjectLive: (id: string, recipe: (o: Draft<DesignObject>) => void) => void;
@@ -108,11 +122,14 @@ interface AppState {
   setView: (view: StandardView, fitBounds?: boolean) => void;
   setActiveStandardView: (view: StandardView | null) => void;
 
-  loadProject: (doc: Project, files: Record<string, Blob>) => void;
+  loadProject: (doc: Project, files: Record<string, Blob>, modelFiles?: Record<string, Blob>) => void;
   resetProject: () => void;
 }
 
-const DEFAULTS: Record<DesignKind, () => Omit<DesignObject, 'id' | 'name' | 'transform'>> = {
+/** Kinds created from parameters (everything except imported files). */
+export type PrimitiveKind = Exclude<DesignKind, 'model'>;
+
+const DEFAULTS: Record<PrimitiveKind, () => Omit<DesignObject, 'id' | 'name' | 'transform'>> = {
   box: () => ({ kind: 'box', length: 1000, width: 600, height: 400, color: '#f59e0b', visible: true }),
   cylinder: () => ({ kind: 'cylinder', diameter: 400, length: 1000, color: '#38bdf8', visible: true }),
   polyShape: () => ({
@@ -184,7 +201,7 @@ const DEFAULTS: Record<DesignKind, () => Omit<DesignObject, 'id' | 'name' | 'tra
   }),
 };
 
-const LABEL: Record<DesignKind, string> = {
+const LABEL: Record<PrimitiveKind, string> = {
   box: 'Box',
   cylinder: 'Cylinder',
   polyShape: 'Platform / Duct Slab',
@@ -200,6 +217,7 @@ export const useApp = create<AppState>()((set, get) => ({
   past: [],
   future: [],
   scanFiles: {},
+  modelFiles: {},
 
   tool: 'select',
   selection: null,
@@ -292,6 +310,60 @@ export const useApp = create<AppState>()((set, get) => ({
     });
     set({ selection: { type: 'object', id } });
     return id;
+  },
+
+  addModel: async (file, name) => {
+    const format = modelFormatFor(name);
+    if (!format) throw new Error(`Unsupported object file: ${name} (use .glb or .stl)`);
+    const assetId = uid('model_');
+    const raw = await loadModelGeometry(assetId, file, format);
+    const sourceUnits = guessUnits(raw, format);
+    const upAxis = defaultUpAxis(format);
+    const placed = placeModelGeometry(raw, sourceUnits, upAxis, 1);
+    placed.geometry.dispose();
+
+    // Drop it in the middle of the scan, sitting on the scan's floor level.
+    const b = get().bounds;
+    const at: Vec3 = b
+      ? [Math.round((b.min[0] + b.max[0]) / 2), Math.round((b.min[1] + b.max[1]) / 2), Math.round(b.min[2])]
+      : [0, 0, 0];
+    const align = get().doc.sceneAlignment ?? 0;
+    const id = uid('obj_');
+    const obj: ImportedModelObject = {
+      kind: 'model',
+      id,
+      name: name.replace(/\.(glb|gltf|stl)$/i, ''),
+      color: '#cbd5e1',
+      visible: true,
+      transform: { position: at, rotation: [0, 0, Math.round(align * 10) / 10] },
+      assetId,
+      fileName: name,
+      format,
+      sourceUnits,
+      upAxis,
+      scale: 1,
+      size: placed.sizeMm.map((v) => Math.round(v)) as Vec3,
+    };
+    set((s) => ({ modelFiles: { ...s.modelFiles, [assetId]: file } }));
+    get().commit((d) => {
+      d.objects.push(obj);
+    });
+    set({ selection: { type: 'object', id }, tool: 'select' });
+    return id;
+  },
+
+  updateModel: async (id, patch) => {
+    const o = get().doc.objects.find((x) => x.id === id);
+    const blob = o?.kind === 'model' ? get().modelFiles[o.assetId] : undefined;
+    if (!o || o.kind !== 'model' || !blob) return;
+    const next = { ...o, ...patch };
+    const raw = await loadModelGeometry(o.assetId, blob, o.format);
+    const placed = placeModelGeometry(raw, next.sourceUnits, next.upAxis, next.scale);
+    placed.geometry.dispose();
+    get().updateObject(id, (d) => {
+      Object.assign(d, patch);
+      (d as ImportedModelObject).size = placed.sizeMm.map((v) => Math.round(v)) as Vec3;
+    });
   },
 
   updateObject: (id, recipe) =>
@@ -508,10 +580,11 @@ export const useApp = create<AppState>()((set, get) => ({
   showGrid: true,
   setShowGrid: (showGrid) => set({ showGrid }),
 
-  loadProject: (doc, files) =>
+  loadProject: (doc, files, modelFiles = {}) =>
     set((s) => ({
       doc,
       scanFiles: files,
+      modelFiles,
       past: [],
       future: [],
       selection: null,
@@ -521,7 +594,7 @@ export const useApp = create<AppState>()((set, get) => ({
     })),
 
   resetProject: () =>
-    set({ doc: newProject(), scanFiles: {}, past: [], future: [], selection: null, pendingA: null, tool: 'select' }),
+    set({ doc: newProject(), scanFiles: {}, modelFiles: {}, past: [], future: [], selection: null, pendingA: null, tool: 'select' }),
 }));
 
 function validSel(sel: Selection, doc: Project): Selection {

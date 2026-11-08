@@ -135,6 +135,31 @@ export interface SteelBeamObject extends BaseObject {
   rollAngle: number;
 }
 
+export type ModelFormat = 'glb' | 'stl';
+export type ModelUnits = 'mm' | 'cm' | 'm' | 'in' | 'ft';
+export type ModelUpAxis = 'y' | 'z';
+
+/**
+ * Imported GLB/STL object. Origin at the centre of the base of its bounding box.
+ * The file itself is stored outside the JSON document (keyed by `assetId`), so
+ * duplicates share one copy.
+ */
+export interface ImportedModelObject extends BaseObject {
+  kind: 'model';
+  /** Key of the source file in the model file store. */
+  assetId: string;
+  fileName: string;
+  format: ModelFormat;
+  /** Units the file was authored in (auto-detected on import, user-correctable). */
+  sourceUnits: ModelUnits;
+  /** Which axis is "up" in the file. GLB is Y-up; STL is usually Z-up. */
+  upAxis: ModelUpAxis;
+  /** Extra uniform scale on top of the unit conversion (1 = true size). */
+  scale: number;
+  /** Size after units/scale, user frame mm (L × W × H). Display/BOM only. */
+  size: Vec3;
+}
+
 export type DesignObject =
   | BoxObject
   | CylinderObject
@@ -143,7 +168,8 @@ export type DesignObject =
   | SwingGateObject
   | LadderObject
   | StairsObject
-  | SteelBeamObject;
+  | SteelBeamObject
+  | ImportedModelObject;
 export type DesignKind = DesignObject['kind'];
 
 export interface Measurement {

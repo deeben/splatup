@@ -25,6 +25,8 @@ export function NumberField({ label, value, onCommit, suffix = 'mm', min, max, t
   }, [value]);
 
   const commit = () => {
+    // Untouched field: don't commit the rounded display value over the real one.
+    if (text.trim() === fmtNum(value)) return setInvalid(false);
     const v = evalExpr(text);
     if (v == null || (min != null && v < min) || (max != null && v > max)) {
       setInvalid(true);
