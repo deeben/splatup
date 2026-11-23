@@ -56,21 +56,48 @@ export interface PolyShapeObject extends BaseObject {
   isHollow?: boolean;
 }
 
+export type HandrailHoops = 'both' | 'start' | 'end' | 'none';
+export type HandrailMount = 'base' | 'sideBolted' | 'sidePocket';
+
+/** A span whose top rail can move out of the way (e.g. to let a crane past). */
+export interface HandrailMovableSpan {
+  /** 'slide' telescopes along the run; 'pivot' hinges up at the first post. */
+  type: 'slide' | 'pivot';
+  /** 1-based span number counted from the start of the run (must be a straight span). */
+  span: number;
+  /** Preview position: 0 = closed, 1 = fully open. */
+  open: number;
+}
+
 /** Monowills-style industrial handrail (AS 1657) with ball stanchions and toeboard. */
 export interface HandrailObject extends BaseObject {
   kind: 'handrail';
   /** Path points (mm, local to object origin). Minimum 2 points for a straight run. */
   points: Vec3[];
-  /** Monowills standard height: 900mm or 1000mm. */
-  height: 900 | 1000;
+  /**
+   * Base to top rail height (mm). 1000 / 900 are standard; lower values draw
+   * half-height rails, e.g. on top of bridge cranes. A mid rail is added
+   * automatically whenever this exceeds 450 mm.
+   */
+  height: number;
   /** Stanchion spacing along the run (mm, standard 1500mm, max 2000mm per AS 1657). */
   stanchionSpacing: number;
   /** Include 100mm kickplate / toeboard along bottom edge. */
   hasKickplate: boolean;
-  /** Include knee rail (mid rail). */
-  hasMidrail: boolean;
+  /** @deprecated The mid rail now follows the 450 mm gap rule; kept so older files load. */
+  hasMidrail?: boolean;
   /** Pipe outer diameter (mm, standard 42.4mm for 32NB). */
   pipeDiameter: number;
+  /** Closure hoops at the run ends (default 'none' for files made before hoops existed). */
+  endHoops?: HandrailHoops;
+  /** Stanchion fixing: top-mounted baseplate, side-mounted bolted, or removable side pocket. */
+  mount?: HandrailMount;
+  /** For side mounts: which side of the run (looking from the first point) the supporting steel is on. */
+  mountSide?: 'left' | 'right';
+  /** For side mounts: stanchion leg length below floor level (mm, default 300) to reach past the grating and bolt to the PFC. */
+  sideLegLength?: number;
+  /** Optional sliding or pivoting top rail span. */
+  movableSpan?: HandrailMovableSpan | null;
 }
 
 /** Monowills self-closing safety swing gate module. */
@@ -120,6 +147,8 @@ export interface StairsObject extends BaseObject {
   handrailHeight: 900 | 1000;
   /** Include 100mm kickplate / toeboard on stringers. */
   hasKickplate: boolean;
+  /** Closure hoops at the top and bottom of the stair handrails (default on). */
+  handrailHoops?: boolean;
 }
 
 /** Australian Standard Structural Steel Section (UB, UC, PFC, SHS/RHS, EA). */
@@ -133,6 +162,27 @@ export interface SteelBeamObject extends BaseObject {
   alignment: 'topCenter' | 'center' | 'bottomCenter';
   /** Axial roll rotation in degrees (0 = strong axis vertical). */
   rollAngle: number;
+  /** Padeyes / load rings fitted to the beam. Optional so older projects load unchanged. */
+  liftingPoints?: BeamLiftingPoint[];
+}
+
+/** 'padeye' = welded plate with a shackle hole; 'rudWeld' / 'rudBolt' = RUD-style load ring. */
+export type LiftingPointType = 'padeye' | 'rudWeld' | 'rudBolt';
+
+/** A lifting attachment on a steel beam. Sizes come from `geometry/liftingPoints.ts`. */
+export interface BeamLiftingPoint {
+  id: string;
+  type: LiftingPointType;
+  /** Distance from the beam start, along its length (mm). */
+  offset: number;
+  /** Outer face of the top or bottom flange (before the beam's roll is applied). */
+  face: 'top' | 'bottom';
+  /** Working load limit (tonnes); selects the catalogue size. */
+  wll: number;
+  /** Plate / ring plane runs in line with the beam or across it. */
+  orientation: 'along' | 'across';
+  /** Offset across the flange from the section centreline (mm). Omitted = automatic. */
+  lateral?: number;
 }
 
 /** How a column-mounted jib's pivot brackets attach to the column flange. */

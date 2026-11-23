@@ -490,8 +490,10 @@ import type {
 } from './types';
 import type { CapturedView } from '../viewport/registry';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
+import { beamLiftingMass, liftingSummary } from '../viewport/geometry/liftingPoints';
 import { computePolyMetrics } from '../viewport/geometry/polyPrism';
 import { computeJibMetrics } from '../viewport/geometry/jibCrane';
+import { MIDRAIL_GAP_MAX_MM } from '../viewport/geometry/handrailSystem';
 
 function drawSheetBorderAndTitleBlock(
   pdf: PdfWriter,
@@ -783,7 +785,7 @@ export async function generateElevationsPdf(
     if (o.kind === 'beam') {
       const bo = o as SteelBeamObject;
       const sec = STEEL_CATALOGUE[bo.sectionName] ?? STEEL_CATALOGUE[DEFAULT_SECTION];
-      totalSteelWeight += (sec.mass * bo.length) / 1000;
+      totalSteelWeight += (sec.mass * bo.length) / 1000 + beamLiftingMass(bo);
     } else if (o.kind === 'jib') {
       totalSteelWeight += computeJibMetrics(o).massKg;
     }
@@ -930,11 +932,12 @@ export async function generateElevationsPdf(
     if (o.kind === 'beam') {
       const bo = o as SteelBeamObject;
       const sec = STEEL_CATALOGUE[bo.sectionName] ?? STEEL_CATALOGUE[DEFAULT_SECTION];
-      const m = (sec.mass * bo.length) / 1000;
+      const m = (sec.mass * bo.length) / 1000 + beamLiftingMass(bo);
       totalMass += m;
       typeStr = `BEAM (${sec.category})`;
       dimsStr = `L = ${bo.length} mm (${sec.depth} x ${sec.flangeWidth})`;
-      specStr = `${sec.label} (${sec.mass} kg/m)`;
+      const lifting = liftingSummary(bo);
+      specStr = lifting ? `${sec.label} + ${lifting}` : `${sec.label} (${sec.mass} kg/m)`;
       massStr = `${m.toFixed(1)} kg`;
     } else if (o.kind === 'stairs') {
       const so = o as StairsObject;
@@ -945,7 +948,7 @@ export async function generateElevationsPdf(
       const ho = o as HandrailObject;
       typeStr = 'HANDRAIL (AS 1657)';
       dimsStr = `H = ${ho.height} mm · OD ${ho.pipeDiameter} mm`;
-      specStr = `${ho.hasKickplate ? '100mm Kickplate' : ''} ${ho.hasMidrail ? 'Midrail' : ''}`;
+      specStr = handrailSpec(ho);
     } else if (o.kind === 'box') {
       const bo = o as BoxObject;
       typeStr = 'BOX / DUCT';
@@ -1022,3 +1025,17 @@ export async function generateElevationsPdf(
   return new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
 }
 
+
+/** One-line spec for a handrail run on the drawing schedule. */
+function handrailSpec(ho: HandrailObject): string {
+  const parts: string[] = [];
+  parts.push(ho.height > MIDRAIL_GAP_MAX_MM ? 'Midrail' : 'No midrail');
+  if (ho.hasKickplate) parts.push('100mm Kickplate');
+  const hoops = ho.endHoops ?? 'none';
+  if (hoops === 'both') parts.push('End hoops');
+  else if (hoops !== 'none') parts.push(`Hoop at ${hoops}`);
+  if (ho.mount === 'sideBolted') parts.push('Side mount bolted');
+  else if (ho.mount === 'sidePocket') parts.push('Removable (pocket)');
+  if (ho.movableSpan) parts.push(`${ho.movableSpan.type === 'slide' ? 'Sliding' : 'Pivoting'} top rail span ${ho.movableSpan.span}`);
+  return parts.join(' · ');
+}

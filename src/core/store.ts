@@ -107,7 +107,7 @@ interface AppState {
   popDrawingPoint: () => void;
   clearDrawingPoints: () => void;
   addPolyShape: (points: Vec3[], thickness?: number) => string;
-  addHandrail: (points: Vec3[], height?: 900 | 1000) => string;
+  addHandrail: (points: Vec3[], height?: number) => string;
 
   /** Set project/scene orientation angle in degrees. */
   setSceneAlignment: (angle: number) => void;
@@ -155,8 +155,9 @@ const DEFAULTS: Record<PrimitiveKind, () => Omit<DesignObject, 'id' | 'name' | '
     height: 1000,
     stanchionSpacing: 1500,
     hasKickplate: true,
-    hasMidrail: true,
     pipeDiameter: 42.4,
+    endHoops: 'both' as const,
+    mount: 'base' as const,
     color: '#facc15',
     visible: true,
   }),
@@ -189,6 +190,7 @@ const DEFAULTS: Record<PrimitiveKind, () => Omit<DesignObject, 'id' | 'name' | '
     handrailSide: 'both' as const,
     handrailHeight: 1000 as const,
     hasKickplate: true,
+    handrailHoops: true,
     color: '#f59e0b',
     visible: true,
   }),
@@ -422,9 +424,12 @@ export const useApp = create<AppState>()((set, get) => ({
     if (!src) return;
     const nid = uid('obj_');
     const p = src.transform.position;
+    const copy = structuredClone(src);
+    // Lifting points belong to the original beam; a copied beam starts bare.
+    if (copy.kind === 'beam') delete copy.liftingPoints;
     get().commit((d) => {
       d.objects.push({
-        ...structuredClone(src),
+        ...copy,
         id: nid,
         name: `${src.name} copy`,
         transform: { position: [p[0] + 500, p[1], p[2]], rotation: [...src.transform.rotation] as Vec3 },
@@ -535,8 +540,9 @@ export const useApp = create<AppState>()((set, get) => ({
       height,
       stanchionSpacing: 1500,
       hasKickplate: true,
-      hasMidrail: true,
       pipeDiameter: 42.4,
+      endHoops: 'both',
+      mount: 'base',
       color: '#facc15',
       visible: true,
     };
