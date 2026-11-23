@@ -5,7 +5,8 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { useApp } from '../core/store';
 import { axisLock, pick } from './pick';
 import { registry } from './registry';
-import type { SnapResult, StairsObject, SteelBeamObject } from '../core/types';
+import type { JibCraneObject, SnapResult, StairsObject, SteelBeamObject } from '../core/types';
+import { worldToUser } from '../core/frame';
 
 const CLICK_TOLERANCE_PX = 5;
 
@@ -223,6 +224,28 @@ export function ToolController() {
             st.setTool('select');
             st.setStatus(`Industrial stairs (Rise: ${dz} mm, ${numSteps} steps) placed`);
           }
+          break;
+        }
+        case 'jib': {
+          // One click on the column face at top-of-boom height. The boom is turned to
+          // point back toward the camera (the side of the column you're looking at),
+          // squared to the nearest 90° of the scene alignment so it sits on the grid.
+          const s = snapAt(e);
+          if (!s) {
+            st.setStatus('Click on the column face in the scan to place the jib');
+            return;
+          }
+          const cam = worldToUser(camera.position);
+          const yaw = (Math.atan2(cam[1] - s.point[1], cam[0] - s.point[0]) * 180) / Math.PI;
+          const align = st.doc.sceneAlignment ?? 0;
+          let yawDeg = align + Math.round((yaw - align) / 90) * 90;
+          yawDeg = ((((yawDeg + 180) % 360) + 360) % 360) - 180;
+          const id = st.addObject('jib', s.point.map((v) => Math.round(v)) as typeof s.point);
+          st.updateObjectLive(id, (o) => {
+            (o as JibCraneObject).transform.rotation = [0, 0, yawDeg];
+          });
+          st.setTool('select');
+          st.setStatus('Jib crane placed · set mounting, bracing and span in the panel on the right');
           break;
         }
         case 'box':

@@ -18,6 +18,7 @@ import { computePolyMetrics } from '../viewport/geometry/polyPrism';
 import { computeStairsMetrics } from '../viewport/geometry/stairs';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
 import { registry } from '../viewport/registry';
+import { JibPanel } from './JibPanel';
 
 const COLOR_PRESETS = [
   { label: 'Amber (Duct)', color: '#f59e0b' },
@@ -844,6 +845,8 @@ export function PropertyPanel() {
                 </>
               );
             })()}
+
+            {obj.kind === 'jib' && <JibPanel obj={obj} />}
 
             {obj.kind === 'model' && (
               <>

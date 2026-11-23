@@ -491,6 +491,7 @@ import type {
 import type { CapturedView } from '../viewport/registry';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
 import { computePolyMetrics } from '../viewport/geometry/polyPrism';
+import { computeJibMetrics } from '../viewport/geometry/jibCrane';
 
 function drawSheetBorderAndTitleBlock(
   pdf: PdfWriter,
@@ -783,6 +784,8 @@ export async function generateElevationsPdf(
       const bo = o as SteelBeamObject;
       const sec = STEEL_CATALOGUE[bo.sectionName] ?? STEEL_CATALOGUE[DEFAULT_SECTION];
       totalSteelWeight += (sec.mass * bo.length) / 1000;
+    } else if (o.kind === 'jib') {
+      totalSteelWeight += computeJibMetrics(o).massKg;
     }
   }
 
@@ -969,6 +972,13 @@ export async function generateElevationsPdf(
       typeStr = 'SWING GATE (AS 1657)';
       dimsStr = `W = ${go.width} mm · H = ${go.height} mm`;
       specStr = `Self-Closing Gate · ${go.hasKickplate ? 'With Kickplate' : 'Open'}`;
+    } else if (o.kind === 'jib') {
+      const jm = computeJibMetrics(o);
+      totalMass += jm.massKg;
+      typeStr = `JIB (${o.mounting === 'boltOn' ? 'BOLT-ON' : 'WELD-ON'})`;
+      dimsStr = `Span ${o.span} mm · Pins @ ${o.bracketCentres} mm`;
+      specStr = `${o.bracing === 'lowHeadroom' ? 'Low headroom' : 'Over-braced'} · ${jm.boom.label} · SWL ${o.swl} kg`;
+      massStr = `${jm.massKg.toFixed(1)} kg`;
     } else if (o.kind === 'model') {
       typeStr = `IMPORTED (${o.format.toUpperCase()})`;
       dimsStr = `${o.size[0]} x ${o.size[1]} x ${o.size[2]} mm`;

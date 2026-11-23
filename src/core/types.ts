@@ -135,6 +135,46 @@ export interface SteelBeamObject extends BaseObject {
   rollAngle: number;
 }
 
+/** How a column-mounted jib's pivot brackets attach to the column flange. */
+export type JibMounting = 'boltOn' | 'weldOn';
+/**
+ * Jib arrangement:
+ *  - 'lowHeadroom': boom sits at the top, knee brace underneath to a heel post.
+ *    Little or nothing above the boom, but the brace limits hook approach to the column.
+ *  - 'overBraced': boom pinned at the bottom bracket, tie bar above it to a top bracket.
+ *    Needs headroom above the boom, but the hoist can travel almost to the column.
+ */
+export type JibBracing = 'lowHeadroom' | 'overBraced';
+
+/**
+ * Column-mounted slewing jib crane.
+ * Origin: on the column flange face, at the top of the boom steel (TOS), on the pivot line.
+ * The boom points along local +X; the column sits behind the origin (local −X).
+ */
+export interface JibCraneObject extends BaseObject {
+  kind: 'jib';
+  mounting: JibMounting;
+  bracing: JibBracing;
+  /** Outreach from the pivot pin to the boom tip (mm). */
+  span: number;
+  /** Boom section designation from the steel catalogue (UB/UC). */
+  boomSection: string;
+  /** Column the brackets clamp or weld to (sizes the bracket plates). */
+  columnSection: string;
+  /** Vertical distance between the top and bottom pivot pins (mm). */
+  bracketCentres: number;
+  /** Slew angle of the boom about the pivot (degrees, 0 = straight out). */
+  slewAngle: number;
+  /** Safe working load (kg). Shown in the panel and schedules only. */
+  swl: number;
+  /** Draw a short stub of the column so the brackets have context. Not counted in the BOM. */
+  showColumn: boolean;
+  /** Draw a hoist and trolley on the boom. */
+  showHoist: boolean;
+  /** Trolley position measured from the pivot pin (mm). Clamped to the reachable range. */
+  trolleyPosition: number;
+}
+
 export type ModelFormat = 'glb' | 'stl';
 export type ModelUnits = 'mm' | 'cm' | 'm' | 'in' | 'ft';
 export type ModelUpAxis = 'y' | 'z';
@@ -169,6 +209,7 @@ export type DesignObject =
   | LadderObject
   | StairsObject
   | SteelBeamObject
+  | JibCraneObject
   | ImportedModelObject;
 export type DesignKind = DesignObject['kind'];
 
@@ -249,7 +290,8 @@ export type Tool =
   | 'gate'
   | 'ladder'
   | 'stairs'
-  | 'beam';
+  | 'beam'
+  | 'jib';
 
 export type SnapKind = 'vertex' | 'corner' | 'face' | 'axis';
 

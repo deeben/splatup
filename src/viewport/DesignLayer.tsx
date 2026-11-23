@@ -30,6 +30,7 @@ import { buildPolyPrismGeometry } from './geometry/polyPrism';
 import { buildAccessLadder, buildMonowillsHandrail, buildSwingGate } from './geometry/monowills';
 import { buildStairsGeometry } from './geometry/stairs';
 import { buildSteelBeamGeometry } from './geometry/steelSections';
+import { buildJibCraneGeometry } from './geometry/jibCrane';
 import { PullHandles } from './PullHandles';
 import { loadModelGeometry, modelSnapPoints, placeModelGeometry } from './loaders/modelLoader';
 
@@ -316,6 +317,16 @@ function shapeFor(obj: DesignObject): {
   if (obj.kind === 'beam') {
     const o = obj as SteelBeamObject;
     const res = buildSteelBeamGeometry(o);
+    return {
+      geometry: res.geometry,
+      offsetY: 0,
+      snapPoints: res.snapPoints,
+      showEdges: true,
+    };
+  }
+
+  if (obj.kind === 'jib') {
+    const res = buildJibCraneGeometry(obj);
     return {
       geometry: res.geometry,
       offsetY: 0,
