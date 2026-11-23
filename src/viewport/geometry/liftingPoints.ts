@@ -277,16 +277,49 @@ export function buildLiftingPointParts(
       parts.push({ geom: part.geom, matrix: place.clone().multiply(part.matrix) });
     }
 
-    // Snap to the eye: hole centre for a padeye, top of the ring otherwise.
-    const eyeH =
-      p.type === 'padeye'
-        ? mm(padeyeSize(p.wll).holeHeight)
-        : p.type === 'rudWeld'
-          ? mm(rudWeldSize(p.wll).block[2] * 0.7 + rudWeldSize(p.wll).inner + rudWeldSize(p.wll).bar * 1.5)
-          : mm(rudBoltSize(p.wll).base[1] * 0.85 + rudBoltSize(p.wll).inner + rudBoltSize(p.wll).bar * 1.5);
-    snapPoints.push([x, down ? -D / 2 - eyeH : D / 2 + eyeH, z]);
+    snapPoints.push(eyeCentred(obj, sec, p));
   }
   return { parts, snapPoints };
+}
+
+/**
+ * The lifting eye (hole centre for a padeye, top of the ring otherwise) in the
+ * centred beam frame used by `buildLiftingPointParts`.
+ */
+function eyeCentred(obj: SteelBeamObject, sec: SectionDef, p: BeamLiftingPoint): [number, number, number] {
+  const D = mm(sec.depth);
+  const x = mm(Math.min(Math.max(p.offset, 0), obj.length));
+  const z = mm(lateralOf(sec, p));
+  const eyeH =
+    p.type === 'padeye'
+      ? mm(padeyeSize(p.wll).holeHeight)
+      : p.type === 'rudWeld'
+        ? mm(rudWeldSize(p.wll).block[2] * 0.7 + rudWeldSize(p.wll).inner + rudWeldSize(p.wll).bar * 1.5)
+        : mm(rudBoltSize(p.wll).base[1] * 0.85 + rudBoltSize(p.wll).inner + rudBoltSize(p.wll).bar * 1.5);
+  return [x, p.face === 'bottom' ? -D / 2 - eyeH : D / 2 + eyeH, z];
+}
+
+/**
+ * Converts a point from the centred beam frame to the beam object's local
+ * frame (metres), applying its alignment offset and roll the same way the
+ * steel geometry is.
+ */
+export function centredToBeamLocal(
+  obj: SteelBeamObject,
+  sec: SectionDef,
+  [x, y, z]: [number, number, number],
+): [number, number, number] {
+  const D = mm(sec.depth);
+  const yy = y + (obj.alignment === 'topCenter' ? -D / 2 : obj.alignment === 'bottomCenter' ? D / 2 : 0);
+  const roll = ((obj.rollAngle ?? 0) * Math.PI) / 180;
+  const c = Math.cos(roll);
+  const s = Math.sin(roll);
+  return [x, yy * c - z * s, yy * s + z * c];
+}
+
+/** Lifting eye position in the beam object's local frame (for handles). */
+export function liftingEyeLocal(obj: SteelBeamObject, sec: SectionDef, p: BeamLiftingPoint): [number, number, number] {
+  return centredToBeamLocal(obj, sec, eyeCentred(obj, sec, p));
 }
 
 /** Approximate steel mass of one lifting point (kg). */

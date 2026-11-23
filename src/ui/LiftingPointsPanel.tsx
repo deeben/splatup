@@ -73,7 +73,7 @@ export function LiftingPointsPanel({ beam }: { beam: SteelBeamObject }) {
       </div>
 
       {points.length === 0 && (
-        <div className="subtext">Padeyes and RUD load rings fitted to this beam. They move and roll with it.</div>
+        <div className="subtext">Padeyes and RUD load rings fitted to this beam. Drag the blue handles at each eye to slide it along the beam.</div>
       )}
 
       {points.map((p, i) => {

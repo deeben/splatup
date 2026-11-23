@@ -4,7 +4,7 @@ import {
   ExtrudeGeometry,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { beamLiftingMass, buildLiftingPointParts } from './liftingPoints';
+import { beamLiftingMass, buildLiftingPointParts, centredToBeamLocal } from './liftingPoints';
 import type { SteelBeamObject } from '../../core/types';
 import { mm } from '../../core/frame';
 
@@ -307,13 +307,7 @@ export function buildSteelBeamGeometry(obj: SteelBeamObject): {
   ];
 
   // Lifting eyes are snap targets too (alignment offset and roll applied like the steel).
-  const roll = ((obj.rollAngle ?? 0) * Math.PI) / 180;
-  const cr = Math.cos(roll);
-  const sr = Math.sin(roll);
-  for (const [x, y, z] of lifting.snapPoints) {
-    const yy = y + yOffset;
-    snapPoints.push([x, yy * cr - z * sr, yy * sr + z * cr]);
-  }
+  for (const pt of lifting.snapPoints) snapPoints.push(centredToBeamLocal(obj, secDef, pt));
 
   const massKg = (secDef.mass * obj.length) / 1000 + beamLiftingMass(obj);
 
