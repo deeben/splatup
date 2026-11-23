@@ -162,6 +162,27 @@ export interface SteelBeamObject extends BaseObject {
   alignment: 'topCenter' | 'center' | 'bottomCenter';
   /** Axial roll rotation in degrees (0 = strong axis vertical). */
   rollAngle: number;
+  /** Padeyes / load rings fitted to the beam. Optional so older projects load unchanged. */
+  liftingPoints?: BeamLiftingPoint[];
+}
+
+/** 'padeye' = welded plate with a shackle hole; 'rudWeld' / 'rudBolt' = RUD-style load ring. */
+export type LiftingPointType = 'padeye' | 'rudWeld' | 'rudBolt';
+
+/** A lifting attachment on a steel beam. Sizes come from `geometry/liftingPoints.ts`. */
+export interface BeamLiftingPoint {
+  id: string;
+  type: LiftingPointType;
+  /** Distance from the beam start, along its length (mm). */
+  offset: number;
+  /** Outer face of the top or bottom flange (before the beam's roll is applied). */
+  face: 'top' | 'bottom';
+  /** Working load limit (tonnes); selects the catalogue size. */
+  wll: number;
+  /** Plate / ring plane runs in line with the beam or across it. */
+  orientation: 'along' | 'across';
+  /** Offset across the flange from the section centreline (mm). Omitted = automatic. */
+  lateral?: number;
 }
 
 export type ModelFormat = 'glb' | 'stl';

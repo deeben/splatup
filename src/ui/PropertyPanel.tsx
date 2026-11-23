@@ -22,6 +22,8 @@ import { handrailLayout } from '../viewport/geometry/monowills';
 import { MIDRAIL_GAP_MAX_MM } from '../viewport/geometry/handrailSystem';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
 import { registry } from '../viewport/registry';
+import { beamLiftingMass } from '../viewport/geometry/liftingPoints';
+import { LiftingPointsPanel } from './LiftingPointsPanel';
 
 const COLOR_PRESETS = [
   { label: 'Amber (Duct)', color: '#f59e0b' },
@@ -771,7 +773,7 @@ export function PropertyPanel() {
             {obj.kind === 'beam' && (() => {
               const bo = obj as SteelBeamObject;
               const secDef = STEEL_CATALOGUE[bo.sectionName] ?? STEEL_CATALOGUE[DEFAULT_SECTION];
-              const totalMassKg = (secDef.mass * bo.length) / 1000;
+              const totalMassKg = (secDef.mass * bo.length) / 1000 + beamLiftingMass(bo);
 
               return (
                 <>
@@ -1036,6 +1038,8 @@ export function PropertyPanel() {
               </>
             )}
           </div>
+
+          {obj.kind === 'beam' && <LiftingPointsPanel beam={obj as SteelBeamObject} />}
 
           {/* Position Section */}
           <div className="section-group">

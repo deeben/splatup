@@ -26,6 +26,7 @@ import type {
 } from '../core/types';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from './geometry/steelSections';
 import { computeStairsMetrics } from './geometry/stairs';
+import { liftingEyeLocal } from './geometry/liftingPoints';
 
 interface HandleDef {
   id: string;
@@ -602,7 +603,7 @@ function getHandlesForObject(obj: DesignObject): HandleDef[] {
       if (o.alignment === 'topCenter') yOffset = -D / 2;
       else if (o.alignment === 'bottomCenter') yOffset = D / 2;
 
-      return [
+      const beamHandles: HandleDef[] = [
         // End of beam (lengthen forward)
         {
           id: 'beam_end',
@@ -630,6 +631,11 @@ function getHandlesForObject(obj: DesignObject): HandleDef[] {
             const newL = Math.max(50, initObj.length + deltaMm);
             const deltaL = newL - initObj.length;
             (draft as SteelBeamObject).length = Math.round(newL);
+            // Lifting points are measured from the start, so shift them to stay put on the steel.
+            (draft as SteelBeamObject).liftingPoints?.forEach((p, i) => {
+              const p0 = initObj.liftingPoints?.[i];
+              if (p0) p.offset = Math.max(0, Math.round(p0.offset + deltaL));
+            });
 
             const offsetLocal = new Vector3(-deltaL * 0.001, 0, 0);
             offsetLocal.applyEuler(userRotToEuler(initObj.transform.rotation));
@@ -643,6 +649,27 @@ function getHandlesForObject(obj: DesignObject): HandleDef[] {
           },
         },
       ];
+
+      // One slide handle each way per lifting point, at its eye, moving it along the beam.
+      const liftingHandles: HandleDef[] = (o.liftingPoints ?? []).flatMap((p, i) =>
+        ([1, -1] as const).map((dir) => ({
+          id: `lift_${p.id}_${dir > 0 ? 'fwd' : 'back'}`,
+          label: `Lift Pt ${i + 1}`,
+          localPos: liftingEyeLocal(o, secDef, p),
+          localAxis: [dir, 0, 0] as [number, number, number],
+          getVal: (d: DesignObject) =>
+            (d as SteelBeamObject).liftingPoints?.find((x) => x.id === p.id)?.offset ?? 0,
+          apply: (draft: DesignObject, deltaMm: number, initDoc: Project) => {
+            const initObj = initDoc.objects.find((x) => x.id === draft.id) as SteelBeamObject | undefined;
+            const p0 = initObj?.liftingPoints?.find((x) => x.id === p.id);
+            const pd = (draft as SteelBeamObject).liftingPoints?.find((x) => x.id === p.id);
+            if (!p0 || !pd || !initObj) return;
+            pd.offset = Math.min(initObj.length, Math.max(0, Math.round(p0.offset + dir * deltaMm)));
+          },
+        })),
+      );
+
+      return [...beamHandles, ...liftingHandles];
     }
 
     case 'polyShape': {

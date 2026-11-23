@@ -407,9 +407,12 @@ export const useApp = create<AppState>()((set, get) => ({
     if (!src) return;
     const nid = uid('obj_');
     const p = src.transform.position;
+    const copy = structuredClone(src);
+    // Lifting points belong to the original beam; a copied beam starts bare.
+    if (copy.kind === 'beam') delete copy.liftingPoints;
     get().commit((d) => {
       d.objects.push({
-        ...structuredClone(src),
+        ...copy,
         id: nid,
         name: `${src.name} copy`,
         transform: { position: [p[0] + 500, p[1], p[2]], rotation: [...src.transform.rotation] as Vec3 },
