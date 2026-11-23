@@ -56,6 +56,7 @@ export function buildMonowillsHandrail(obj: HandrailObject): {
     kickplate: obj.hasKickplate,
     mount: obj.mount ?? 'base',
     mountSide: obj.mountSide === 'right' ? -1 : 1,
+    sideLeg: mm(obj.sideLegLength ?? 300),
     movable: obj.movableSpan ?? null,
   });
   return { geometry: mergeGeometries(items), snapPoints };

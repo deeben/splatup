@@ -94,6 +94,8 @@ export interface HandrailObject extends BaseObject {
   mount?: HandrailMount;
   /** For side mounts: which side of the run (looking from the first point) the supporting steel is on. */
   mountSide?: 'left' | 'right';
+  /** For side mounts: stanchion leg length below floor level (mm, default 300) to reach past the grating and bolt to the PFC. */
+  sideLegLength?: number;
   /** Optional sliding or pivoting top rail span. */
   movableSpan?: HandrailMovableSpan | null;
 }

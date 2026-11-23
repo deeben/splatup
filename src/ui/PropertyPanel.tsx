@@ -337,6 +337,21 @@ export function PropertyPanel() {
                     </div>
                   )}
 
+                  {mount !== 'base' && (
+                    <NumberField
+                      label="Leg Below Floor"
+                      value={ho.sideLegLength ?? 300}
+                      min={170}
+                      max={1000}
+                      title="How far the stanchion runs down past the grating to bolt to the PFC (rail height is still measured from floor level)."
+                      onCommit={(v) =>
+                        updateObject(obj.id, (o) => {
+                          (o as HandrailObject).sideLegLength = Math.round(v);
+                        })
+                      }
+                    />
+                  )}
+
                   <div className="field">
                     <span className="field-label">Movable Top Rail</span>
                     <select

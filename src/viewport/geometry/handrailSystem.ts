@@ -64,6 +64,8 @@ export interface RailSystemOptions {
   mount: MountType;
   /** Which side of the run the supporting steel is on (+1 left, -1 right of travel). */
   mountSide: 1 | -1;
+  /** Side mounts: length of the stanchion leg below floor level, metres (default 0.3). */
+  sideLeg?: number;
   movable?: MovableRail | null;
 }
 
@@ -358,23 +360,27 @@ export function buildRailSystem(opts: RailSystemOptions): { items: GeomItem[]; s
   // ── Stanchions ──────────────────────────────────────────────────────────
   for (const post of posts) {
     const p = post.pos;
-    const across = new Vector3(-post.dir.z, 0, post.dir.x);
+    // Points to the left of travel (user +Y side for a run along +X).
+    const across = new Vector3(post.dir.z, 0, -post.dir.x);
     if (across.lengthSq() < 1e-8) across.set(0, 0, 1);
     across.normalize();
     const runFlat = new Vector3(post.dir.x, 0, post.dir.z);
     if (runFlat.lengthSq() < 1e-8) runFlat.set(1, 0, 0);
     runFlat.normalize();
     const toSteel = across.clone().multiplyScalar(opts.mountSide);
+    const leg = Math.max(0.17, opts.sideLeg ?? 0.3);
 
     let bottom = 0;
     if (opts.mount === 'base') {
       items.push(orientedBox(new Vector3(p.x, p.y + 0.006, p.z), new Vector3(0.12, 0.012, 0.12), runFlat, _up, across));
     } else if (opts.mount === 'sideBolted') {
-      // Stanchion runs down past the floor and bolts through a 100x10 FL cleat on the beam face.
-      bottom = -0.25;
-      const cleatC = new Vector3(p.x, p.y - 0.125, p.z).addScaledVector(toSteel, pipeR + 0.005);
-      items.push(orientedBox(cleatC, new Vector3(0.1, 0.25, 0.01), runFlat, _up, across));
-      for (const y of [-0.06, -0.19]) {
+      // Full height above the floor; the lower leg runs down past the grating and
+      // bolts (2 bolts at 100 crs) through a 100x10 FL cleat to the PFC web below.
+      bottom = -leg;
+      const cleatH = Math.min(0.22, leg);
+      const cleatC = new Vector3(p.x, p.y + bottom + cleatH / 2, p.z).addScaledVector(toSteel, pipeR + 0.005);
+      items.push(orientedBox(cleatC, new Vector3(0.1, cleatH, 0.01), runFlat, _up, across));
+      for (const y of [bottom + cleatH / 2 - 0.05, bottom + cleatH / 2 + 0.05]) {
         const c = new Vector3(p.x, p.y + y, p.z);
         items.push(rod(c.clone().addScaledVector(toSteel, -pipeR - 0.02), c.clone().addScaledVector(toSteel, pipeR + 0.03), 0.008, 8));
         // Bolt head and nut
@@ -382,14 +388,16 @@ export function buildRailSystem(opts: RailSystemOptions): { items: GeomItem[]; s
         items.push(rod(c.clone().addScaledVector(toSteel, pipeR + 0.012), c.clone().addScaledVector(toSteel, pipeR + 0.026), 0.014, 6));
       }
     } else if (opts.mount === 'sidePocket') {
-      // Removable stanchion drops into a DN50 tube sleeve (150 long) welded to the beam face.
-      bottom = -0.165;
+      // Removable stanchion: full height above the floor, lower leg drops past the
+      // grating into a DN50 tube sleeve (150 long) welded to the PFC face below.
+      bottom = -leg;
       const sleeveR = 0.0302;
-      items.push(rod(new Vector3(p.x, p.y - 0.16, p.z), new Vector3(p.x, p.y - 0.01, p.z), sleeveR, 16));
-      const plateC = new Vector3(p.x, p.y - 0.085, p.z).addScaledVector(toSteel, sleeveR + 0.005);
+      const sleeveTop = bottom + 0.155;
+      items.push(rod(new Vector3(p.x, p.y + bottom + 0.005, p.z), new Vector3(p.x, p.y + sleeveTop, p.z), sleeveR, 16));
+      const plateC = new Vector3(p.x, p.y + bottom + 0.08, p.z).addScaledVector(toSteel, sleeveR + 0.005);
       items.push(orientedBox(plateC, new Vector3(0.08, 0.15, 0.01), runFlat, _up, across));
       // Locating collar on the stanchion, resting on the sleeve.
-      items.push(rod(new Vector3(p.x, p.y - 0.01, p.z), new Vector3(p.x, p.y + 0.012, p.z), sleeveR + 0.002, 16));
+      items.push(rod(new Vector3(p.x, p.y + sleeveTop, p.z), new Vector3(p.x, p.y + sleeveTop + 0.02, p.z), sleeveR + 0.002, 16));
     }
 
     items.push(rod(new Vector3(p.x, p.y + bottom, p.z), new Vector3(p.x, p.y + H, p.z), pipeR, 16));
