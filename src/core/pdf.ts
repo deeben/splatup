@@ -490,6 +490,7 @@ import type {
 } from './types';
 import type { CapturedView } from '../viewport/registry';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
+import { beamLiftingMass, liftingSummary } from '../viewport/geometry/liftingPoints';
 import { computePolyMetrics } from '../viewport/geometry/polyPrism';
 
 function drawSheetBorderAndTitleBlock(
@@ -782,7 +783,7 @@ export async function generateElevationsPdf(
     if (o.kind === 'beam') {
       const bo = o as SteelBeamObject;
       const sec = STEEL_CATALOGUE[bo.sectionName] ?? STEEL_CATALOGUE[DEFAULT_SECTION];
-      totalSteelWeight += (sec.mass * bo.length) / 1000;
+      totalSteelWeight += (sec.mass * bo.length) / 1000 + beamLiftingMass(bo);
     }
   }
 
@@ -927,11 +928,12 @@ export async function generateElevationsPdf(
     if (o.kind === 'beam') {
       const bo = o as SteelBeamObject;
       const sec = STEEL_CATALOGUE[bo.sectionName] ?? STEEL_CATALOGUE[DEFAULT_SECTION];
-      const m = (sec.mass * bo.length) / 1000;
+      const m = (sec.mass * bo.length) / 1000 + beamLiftingMass(bo);
       totalMass += m;
       typeStr = `BEAM (${sec.category})`;
       dimsStr = `L = ${bo.length} mm (${sec.depth} x ${sec.flangeWidth})`;
-      specStr = `${sec.label} (${sec.mass} kg/m)`;
+      const lifting = liftingSummary(bo);
+      specStr = lifting ? `${sec.label} + ${lifting}` : `${sec.label} (${sec.mass} kg/m)`;
       massStr = `${m.toFixed(1)} kg`;
     } else if (o.kind === 'stairs') {
       const so = o as StairsObject;

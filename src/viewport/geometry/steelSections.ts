@@ -3,6 +3,8 @@ import {
   Shape,
   ExtrudeGeometry,
 } from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { beamLiftingMass, buildLiftingPointParts } from './liftingPoints';
 import type { SteelBeamObject } from '../../core/types';
 import { mm } from '../../core/frame';
 
@@ -231,6 +233,25 @@ export function buildSteelBeamGeometry(obj: SteelBeamObject): {
   // with Depth D along Three Y (Up), and Flange Width B along Three Z.
   // Rotate around Y by -90 deg so +Z becomes +X:
   extrudeGeom.rotateY(-Math.PI / 2);
+  // That rotation sends the extrusion to -X (0 → -L); shift it so the steel
+  // runs 0 → +L, matching the snap points, pull handles and click-to-place.
+  extrudeGeom.translate(L, 0, 0);
+
+  // Padeyes / load rings are built in the same centred frame, merged in, and
+  // then take the alignment offset and roll below along with the section.
+  const lifting = buildLiftingPointParts(obj, secDef);
+  let beamGeom: BufferGeometry = extrudeGeom;
+  if (lifting.parts.length > 0) {
+    const pieces = [extrudeGeom, ...lifting.parts.map((p) => p.geom.applyMatrix4(p.matrix))].map((g) => {
+      const flat = g.index ? g.toNonIndexed() : g;
+      flat.deleteAttribute('uv');
+      flat.clearGroups();
+      return flat;
+    });
+    beamGeom = mergeGeometries(pieces) ?? extrudeGeom;
+    for (const g of pieces) if (g !== beamGeom) g.dispose();
+    for (const p of lifting.parts) p.geom.dispose();
+  }
 
   // Offset according to Cardinal Point / Alignment:
   // Default is 'center' (y=0, z=0).
@@ -244,13 +265,13 @@ export function buildSteelBeamGeometry(obj: SteelBeamObject): {
   }
 
   if (yOffset !== 0) {
-    extrudeGeom.translate(0, yOffset, 0);
+    beamGeom.translate(0, yOffset, 0);
   }
 
   // Optional roll angle (around longitudinal X axis)
   if (obj.rollAngle && Math.abs(obj.rollAngle) > 0.01) {
     const rollRad = (obj.rollAngle * Math.PI) / 180;
-    extrudeGeom.rotateX(rollRad);
+    beamGeom.rotateX(rollRad);
   }
 
   // Calculate snap points at critical engineering locations
@@ -285,10 +306,19 @@ export function buildSteelBeamGeometry(obj: SteelBeamObject): {
     [L, yOffset - D / 2, B / 2],
   ];
 
-  const massKg = (secDef.mass * obj.length) / 1000;
+  // Lifting eyes are snap targets too (alignment offset and roll applied like the steel).
+  const roll = ((obj.rollAngle ?? 0) * Math.PI) / 180;
+  const cr = Math.cos(roll);
+  const sr = Math.sin(roll);
+  for (const [x, y, z] of lifting.snapPoints) {
+    const yy = y + yOffset;
+    snapPoints.push([x, yy * cr - z * sr, yy * sr + z * cr]);
+  }
+
+  const massKg = (secDef.mass * obj.length) / 1000 + beamLiftingMass(obj);
 
   return {
-    geometry: extrudeGeom,
+    geometry: beamGeom,
     snapPoints,
     secDef,
     massKg,

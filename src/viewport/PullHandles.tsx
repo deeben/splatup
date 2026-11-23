@@ -630,6 +630,11 @@ function getHandlesForObject(obj: DesignObject): HandleDef[] {
             const newL = Math.max(50, initObj.length + deltaMm);
             const deltaL = newL - initObj.length;
             (draft as SteelBeamObject).length = Math.round(newL);
+            // Lifting points are measured from the start, so shift them to stay put on the steel.
+            (draft as SteelBeamObject).liftingPoints?.forEach((p, i) => {
+              const p0 = initObj.liftingPoints?.[i];
+              if (p0) p.offset = Math.max(0, Math.round(p0.offset + deltaL));
+            });
 
             const offsetLocal = new Vector3(-deltaL * 0.001, 0, 0);
             offsetLocal.applyEuler(userRotToEuler(initObj.transform.rotation));
