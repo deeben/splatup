@@ -116,6 +116,14 @@ export function Sidebar() {
                 >
                   + Beam
                 </button>
+                <button
+                  type="button"
+                  className="mini-add-btn"
+                  onClick={() => setTool('jib')}
+                  title="Place Column-Mounted Jib Crane (J): click the column face at top-of-boom height"
+                >
+                  + Jib
+                </button>
               </div>
             </div>
 

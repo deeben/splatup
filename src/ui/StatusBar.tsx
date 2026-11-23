@@ -34,6 +34,8 @@ export function StatusBar() {
                 ? 'Click bottom landing, then top landing to place AS 1657 stairs · Esc to cancel'
                 : tool === 'beam'
                   ? 'Click start point, then end point to place steel beam · Esc to cancel'
+                  : tool === 'jib'
+                    ? 'Click the column face at top-of-boom height to place a jib crane (boom faces the camera) · Esc to cancel'
                   : tool === 'box'
                     ? 'Click on scan surface to place box · Esc to cancel'
                     : tool === 'cylinder'

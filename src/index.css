@@ -519,6 +519,12 @@ html, body, #root {
   gap: 4px;
 }
 
+/* Let the "+ Box / + Beam / + Jib…" buttons wrap instead of running off the sidebar. */
+.outliner-section-header .header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .mini-add-btn {
   background: var(--bg-surface-raised);
   border: 1px solid var(--border);

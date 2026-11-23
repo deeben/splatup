@@ -29,6 +29,7 @@ const paths: Record<string, string> = {
   align: 'M12 2l4 8-4-2-4 2 4-8zM12 22l-4-8 4 2 4-2-4 8z',
   stairs: 'M3 20h4v-4h4v-4h4v-4h5',
   beam: 'M5 5h14M12 5v14M5 19h14M7 5v2M17 5v2M7 17v2M17 17v2',
+  jib: 'M5 2v20M5 5h15M5 13l6-8M17 5v3M15 8h4v3h-4zM17 11v3',
   check: 'M20 6L9 17l-5-5',
   warning: 'M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z',
   target: 'M12 22a10 10 0 100-20 10 10 0 000 20zM12 6a6 6 0 100 12 6 6 0 000-12zM12 2v4M12 18v4M2 12h4M18 12h4',

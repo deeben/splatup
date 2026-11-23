@@ -103,6 +103,9 @@ export function useShortcuts() {
         case 's':
           setTool('beam');
           break;
+        case 'j':
+          setTool('jib');
+          break;
         case 'w':
           setGizmoMode('translate');
           break;

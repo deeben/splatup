@@ -203,6 +203,22 @@ const DEFAULTS: Record<PrimitiveKind, () => Omit<DesignObject, 'id' | 'name' | '
     color: '#64748b',
     visible: true,
   }),
+  jib: () => ({
+    kind: 'jib',
+    mounting: 'boltOn' as const,
+    bracing: 'lowHeadroom' as const,
+    span: 3000,
+    boomSection: '250UB37',
+    columnSection: '310UC97',
+    bracketCentres: 1000,
+    slewAngle: 0,
+    swl: 1000,
+    showColumn: true,
+    showHoist: true,
+    trolleyPosition: 2000,
+    color: '#facc15',
+    visible: true,
+  }),
 };
 
 const LABEL: Record<PrimitiveKind, string> = {
@@ -214,6 +230,7 @@ const LABEL: Record<PrimitiveKind, string> = {
   ladder: 'Access Ladder',
   stairs: 'Industrial Stairs',
   beam: 'Steel Beam',
+  jib: 'Jib Crane',
 };
 
 export const useApp = create<AppState>()((set, get) => ({

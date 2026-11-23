@@ -32,6 +32,7 @@ export function Toolbar() {
     { id: 'ladder', label: 'Access Ladder (AS 1657)', icon: 'ladder', shortcut: '' },
     { id: 'stairs', label: 'Industrial Stairs (AS 1657)', icon: 'stairs', shortcut: 'T' },
     { id: 'beam', label: 'Structural Steel Beam (Aus)', icon: 'beam', shortcut: 'S' },
+    { id: 'jib', label: 'Column-Mounted Jib Crane', icon: 'jib', shortcut: 'J' },
   ];
 
   return (

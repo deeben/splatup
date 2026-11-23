@@ -17,6 +17,7 @@ import type {
   BoxObject,
   CylinderObject,
   DesignObject,
+  JibCraneObject,
   LadderObject,
   PolyShapeObject,
   Project,
@@ -26,6 +27,7 @@ import type {
 } from '../core/types';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from './geometry/steelSections';
 import { computeStairsMetrics } from './geometry/stairs';
+import { PIVOT_OFFSET } from './geometry/jibCrane';
 import { liftingEyeLocal } from './geometry/liftingPoints';
 
 interface HandleDef {
@@ -811,6 +813,29 @@ function getHandlesForObject(obj: DesignObject): HandleDef[] {
               Math.round((p0[1] + deltaUser[1]) * 10) / 10,
               Math.round((p0[2] + deltaUser[2]) * 10) / 10,
             ];
+          },
+        },
+      ];
+    }
+
+    case 'jib': {
+      // Span handle at the boom tip, following the slew angle.
+      const o = obj as JibCraneObject;
+      const a = (o.slewAngle * Math.PI) / 180;
+      const dir: [number, number, number] = [Math.cos(a), 0, -Math.sin(a)];
+      const r = mm(PIVOT_OFFSET + o.span);
+      const e = mm(PIVOT_OFFSET);
+      return [
+        {
+          id: 'jib_span',
+          label: 'Jib Span',
+          localPos: [e + dir[0] * (r - e), 0, dir[2] * (r - e)],
+          localAxis: dir,
+          getVal: (d) => (d as JibCraneObject).span,
+          apply: (draft, deltaMm, initDoc) => {
+            const initObj = initDoc.objects.find((x) => x.id === draft.id) as JibCraneObject;
+            if (!initObj) return;
+            (draft as JibCraneObject).span = Math.round(Math.max(800, initObj.span + deltaMm));
           },
         },
       ];

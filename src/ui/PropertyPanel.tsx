@@ -22,6 +22,7 @@ import { handrailLayout } from '../viewport/geometry/monowills';
 import { MIDRAIL_GAP_MAX_MM } from '../viewport/geometry/handrailSystem';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
 import { registry } from '../viewport/registry';
+import { JibPanel } from './JibPanel';
 import { beamLiftingMass } from '../viewport/geometry/liftingPoints';
 import { LiftingPointsPanel } from './LiftingPointsPanel';
 
@@ -986,6 +987,8 @@ export function PropertyPanel() {
                 </>
               );
             })()}
+
+            {obj.kind === 'jib' && <JibPanel obj={obj} />}
 
             {obj.kind === 'model' && (
               <>
