@@ -491,6 +491,7 @@ import type {
 import type { CapturedView } from '../viewport/registry';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
 import { computePolyMetrics } from '../viewport/geometry/polyPrism';
+import { MIDRAIL_GAP_MAX_MM } from '../viewport/geometry/handrailSystem';
 
 function drawSheetBorderAndTitleBlock(
   pdf: PdfWriter,
@@ -942,7 +943,7 @@ export async function generateElevationsPdf(
       const ho = o as HandrailObject;
       typeStr = 'HANDRAIL (AS 1657)';
       dimsStr = `H = ${ho.height} mm · OD ${ho.pipeDiameter} mm`;
-      specStr = `${ho.hasKickplate ? '100mm Kickplate' : ''} ${ho.hasMidrail ? 'Midrail' : ''}`;
+      specStr = handrailSpec(ho);
     } else if (o.kind === 'box') {
       const bo = o as BoxObject;
       typeStr = 'BOX / DUCT';
@@ -1012,3 +1013,17 @@ export async function generateElevationsPdf(
   return new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
 }
 
+
+/** One-line spec for a handrail run on the drawing schedule. */
+function handrailSpec(ho: HandrailObject): string {
+  const parts: string[] = [];
+  parts.push(ho.height > MIDRAIL_GAP_MAX_MM ? 'Midrail' : 'No midrail');
+  if (ho.hasKickplate) parts.push('100mm Kickplate');
+  const hoops = ho.endHoops ?? 'none';
+  if (hoops === 'both') parts.push('End hoops');
+  else if (hoops !== 'none') parts.push(`Hoop at ${hoops}`);
+  if (ho.mount === 'sideBolted') parts.push('Side mount bolted');
+  else if (ho.mount === 'sidePocket') parts.push('Removable (pocket)');
+  if (ho.movableSpan) parts.push(`${ho.movableSpan.type === 'slide' ? 'Sliding' : 'Pivoting'} top rail span ${ho.movableSpan.span}`);
+  return parts.join(' · ');
+}

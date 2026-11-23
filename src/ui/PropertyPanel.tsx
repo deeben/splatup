@@ -5,6 +5,8 @@ import { Icon } from './Icon';
 import type {
   BoxObject,
   CylinderObject,
+  HandrailHoops,
+  HandrailMount,
   HandrailObject,
   LadderObject,
   ModelUnits,
@@ -16,6 +18,8 @@ import type {
 } from '../core/types';
 import { computePolyMetrics } from '../viewport/geometry/polyPrism';
 import { computeStairsMetrics } from '../viewport/geometry/stairs';
+import { handrailLayout } from '../viewport/geometry/monowills';
+import { MIDRAIL_GAP_MAX_MM } from '../viewport/geometry/handrailSystem';
 import { STEEL_CATALOGUE, DEFAULT_SECTION } from '../viewport/geometry/steelSections';
 import { registry } from '../viewport/registry';
 
@@ -193,13 +197,32 @@ export function PropertyPanel() {
 
             {obj.kind === 'handrail' && (() => {
               const ho = obj as HandrailObject;
-              let totalLengthMm = 0;
-              for (let i = 0; i < ho.points.length - 1; i++) {
-                const a = ho.points[i];
-                const b = ho.points[i + 1];
-                totalLengthMm += Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-              }
-              const stanchionCount = Math.max(2, Math.ceil(totalLengthMm / ho.stanchionSpacing) + 1);
+              const layout = handrailLayout(ho);
+              const totalLengthMm = layout.totalLength * 1000;
+              const stanchionCount = layout.posts.length;
+              const hasMid = ho.height > MIDRAIL_GAP_MAX_MM;
+              const mount = ho.mount ?? 'base';
+              const mv = ho.movableSpan ?? null;
+              const spanCount = layout.straightSpans.length;
+              const setHeight = (h: number) =>
+                updateObject(obj.id, (o) => {
+                  (o as HandrailObject).height = h;
+                });
+              const presetBtn = (h: number, label: string) => (
+                <button
+                  type="button"
+                  className="mini-add-btn"
+                  style={{
+                    padding: '3px 8px',
+                    background: ho.height === h ? '#facc15' : undefined,
+                    color: ho.height === h ? '#000' : undefined,
+                    fontWeight: ho.height === h ? 700 : 500,
+                  }}
+                  onClick={() => setHeight(h)}
+                >
+                  {label}
+                </button>
+              );
 
               return (
                 <>
@@ -215,43 +238,28 @@ export function PropertyPanel() {
                   </div>
 
                   <div className="field">
-                    <span className="field-label">Height (AS 1657)</span>
+                    <span className="field-label">Height presets</span>
                     <div style={{ display: 'flex', gap: 4 }}>
-                      <button
-                        type="button"
-                        className="mini-add-btn"
-                        style={{
-                          padding: '3px 8px',
-                          background: ho.height === 1000 ? '#facc15' : undefined,
-                          color: ho.height === 1000 ? '#000' : undefined,
-                          fontWeight: ho.height === 1000 ? 700 : 500,
-                        }}
-                        onClick={() =>
-                          updateObject(obj.id, (o) => {
-                            (o as HandrailObject).height = 1000;
-                          })
-                        }
-                      >
-                        1000 mm (Std)
-                      </button>
-                      <button
-                        type="button"
-                        className="mini-add-btn"
-                        style={{
-                          padding: '3px 8px',
-                          background: ho.height === 900 ? '#facc15' : undefined,
-                          color: ho.height === 900 ? '#000' : undefined,
-                          fontWeight: ho.height === 900 ? 700 : 500,
-                        }}
-                        onClick={() =>
-                          updateObject(obj.id, (o) => {
-                            (o as HandrailObject).height = 900;
-                          })
-                        }
-                      >
-                        900 mm
-                      </button>
+                      {presetBtn(1000, '1000 (Std)')}
+                      {presetBtn(900, '900')}
+                      {presetBtn(450, '450 (Half)')}
                     </div>
+                  </div>
+
+                  <NumberField
+                    label="Rail Height"
+                    value={ho.height}
+                    min={200}
+                    max={1500}
+                    title="Base to top of rail. Mid rail is added automatically above 450 mm."
+                    onCommit={(v) => setHeight(Math.round(v))}
+                  />
+
+                  <div className="info-row">
+                    <span>Mid / knee rail:</span>
+                    <span className="info-val">
+                      {hasMid ? 'Yes (gap over 450)' : 'None (gap 450 or less)'}
+                    </span>
                   </div>
 
                   <NumberField
@@ -276,6 +284,123 @@ export function PropertyPanel() {
                     }
                   />
 
+                  <div className="field">
+                    <span className="field-label">End Hoops</span>
+                    <select
+                      className="field-select"
+                      value={ho.endHoops ?? 'none'}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as HandrailObject).endHoops = e.target.value as HandrailHoops;
+                        })
+                      }
+                    >
+                      <option value="both">Both ends</option>
+                      <option value="start">Start only</option>
+                      <option value="end">End only</option>
+                      <option value="none">None</option>
+                    </select>
+                  </div>
+
+                  <div className="field">
+                    <span className="field-label">Stanchion Mount</span>
+                    <select
+                      className="field-select"
+                      value={mount}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          (o as HandrailObject).mount = e.target.value as HandrailMount;
+                        })
+                      }
+                    >
+                      <option value="base">Top mount (baseplate)</option>
+                      <option value="sideBolted">Side mount, bolted</option>
+                      <option value="sidePocket">Side mount, removable pocket</option>
+                    </select>
+                  </div>
+
+                  {mount !== 'base' && (
+                    <div className="field">
+                      <span className="field-label">Steel Side</span>
+                      <select
+                        className="field-select"
+                        value={ho.mountSide ?? 'left'}
+                        onChange={(e) =>
+                          updateObject(obj.id, (o) => {
+                            (o as HandrailObject).mountSide = e.target.value as 'left' | 'right';
+                          })
+                        }
+                      >
+                        <option value="left">Left of run</option>
+                        <option value="right">Right of run</option>
+                      </select>
+                    </div>
+                  )}
+
+                  <div className="field">
+                    <span className="field-label">Movable Top Rail</span>
+                    <select
+                      className="field-select"
+                      value={mv?.type ?? 'none'}
+                      onChange={(e) =>
+                        updateObject(obj.id, (o) => {
+                          const h = o as HandrailObject;
+                          const t = e.target.value;
+                          if (t === 'none') h.movableSpan = null;
+                          else {
+                            const lastStraight = Math.max(0, layout.straightSpans.lastIndexOf(true));
+                            h.movableSpan = {
+                              type: t as 'slide' | 'pivot',
+                              span: h.movableSpan?.span ?? lastStraight + 1,
+                              open: h.movableSpan?.open ?? 0,
+                            };
+                          }
+                        })
+                      }
+                    >
+                      <option value="none">None (fixed)</option>
+                      <option value="slide">Sliding span</option>
+                      <option value="pivot">Pivoting (lift-up) span</option>
+                    </select>
+                  </div>
+
+                  {mv && (
+                    <>
+                      <NumberField
+                        label="Movable Span #"
+                        value={mv.span}
+                        min={1}
+                        max={Math.max(1, spanCount)}
+                        suffix=""
+                        title="Counted from the start of the run. Must be a straight span (not across a corner)."
+                        onCommit={(v) =>
+                          updateObject(obj.id, (o) => {
+                            const h = o as HandrailObject;
+                            if (h.movableSpan) h.movableSpan.span = Math.round(v);
+                          })
+                        }
+                      />
+                      {!layout.straightSpans[mv.span - 1] && (
+                        <div className="info-row">
+                          <span style={{ color: '#f87171' }}>Span {mv.span} crosses a corner or doesn't exist.</span>
+                        </div>
+                      )}
+                      <div className="field">
+                        <span className="field-label">Preview open</span>
+                        <LiveRange
+                          value={mv.open}
+                          min={0}
+                          max={1}
+                          step={0.05}
+                          apply={(d, v) => {
+                            const h = d.objects.find((x) => x.id === obj.id) as HandrailObject | undefined;
+                            if (h?.movableSpan) h.movableSpan.open = v;
+                          }}
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <label className="toggle-row">
                     <span>100mm Kickplate (Toeboard)</span>
                     <input
@@ -284,19 +409,6 @@ export function PropertyPanel() {
                       onChange={(e) =>
                         updateObject(obj.id, (o) => {
                           (o as HandrailObject).hasKickplate = e.target.checked;
-                        })
-                      }
-                    />
-                  </label>
-
-                  <label className="toggle-row">
-                    <span>Mid / Knee Rail</span>
-                    <input
-                      type="checkbox"
-                      checked={ho.hasMidrail}
-                      onChange={(e) =>
-                        updateObject(obj.id, (o) => {
-                          (o as HandrailObject).hasMidrail = e.target.checked;
                         })
                       }
                     />
@@ -609,6 +721,19 @@ export function PropertyPanel() {
                           </button>
                         </div>
                       </div>
+
+                      <label className="toggle-row">
+                        <span>End Hoops (top and bottom)</span>
+                        <input
+                          type="checkbox"
+                          checked={so.handrailHoops !== false}
+                          onChange={(e) =>
+                            updateObject(obj.id, (o) => {
+                              (o as StairsObject).handrailHoops = e.target.checked;
+                            })
+                          }
+                        />
+                      </label>
 
                       <label className="toggle-row">
                         <span>100mm Sloping Kickplate</span>

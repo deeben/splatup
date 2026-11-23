@@ -1,66 +1,10 @@
-import {
-  BoxGeometry,
-  BufferAttribute,
-  BufferGeometry,
-  CylinderGeometry,
-  Matrix4,
-  Quaternion,
-  SphereGeometry,
-  Vector3,
-} from 'three';
+import { BoxGeometry, BufferGeometry, Matrix4, Quaternion, Vector3 } from 'three';
 import type { StairsObject } from '../../core/types';
 import { mm } from '../../core/frame';
+import { buildRailSystem, mergeGeometries } from './handrailSystem';
 
 const _q = new Quaternion();
 const _s = new Vector3(1, 1, 1);
-const _up = new Vector3(0, 1, 0);
-
-function mergeGeometries(items: { geom: BufferGeometry; matrix: Matrix4 }[]): BufferGeometry {
-  const merged = new BufferGeometry();
-  let totalVerts = 0;
-  let totalIndices = 0;
-
-  for (const { geom } of items) {
-    const pos = geom.getAttribute('position');
-    if (!pos) continue;
-    totalVerts += pos.count;
-    totalIndices += geom.index ? geom.index.count : pos.count;
-  }
-
-  const positions = new Float32Array(totalVerts * 3);
-  const indices: number[] = [];
-  let vertOffset = 0;
-
-  for (const { geom, matrix } of items) {
-    const pos = geom.getAttribute('position');
-    if (!pos) continue;
-    const v = new Vector3();
-
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(matrix);
-      positions[(vertOffset + i) * 3] = v.x;
-      positions[(vertOffset + i) * 3 + 1] = v.y;
-      positions[(vertOffset + i) * 3 + 2] = v.z;
-    }
-
-    if (geom.index) {
-      for (let i = 0; i < geom.index.count; i++) {
-        indices.push(geom.index.getX(i) + vertOffset);
-      }
-    } else {
-      for (let i = 0; i < pos.count; i++) {
-        indices.push(i + vertOffset);
-      }
-    }
-
-    vertOffset += pos.count;
-  }
-
-  merged.setAttribute('position', new BufferAttribute(positions, 3));
-  merged.setIndex(indices);
-  merged.computeVertexNormals();
-  return merged;
-}
 
 export interface StairsMetrics {
   numRisers: number;
@@ -208,87 +152,32 @@ export function buildStairsGeometry(obj: StairsObject): {
     snapPoints.push([stepX - going / 2, stepY, halfWidth]);
   }
 
-  // Monowills Stair Handrails (mounted to stringers per D-001-S-10015 Detail 12)
+  // Monowills Stair Handrails (mounted to stringers per D-001-S-10015 Detail 12),
+  // with closure hoops at the top and bottom of the flight.
   const side = obj.handrailSide || 'both';
   if (side !== 'none') {
-    const H = mm(obj.handrailHeight || 1000);
-    const midH = H * 0.56;
     const pipeR = mm(42.4) / 2;
-    const midPipeR = pipeR * 0.8;
-    const ballR = pipeR * 1.5;
-
-    const postGeom = new CylinderGeometry(pipeR, pipeR, H, 16);
-    const ballGeom = new SphereGeometry(ballR, 16, 12);
-    const railGeom = new CylinderGeometry(pipeR, pipeR, diagLen, 16);
-    const midRailGeom = new CylinderGeometry(midPipeR, midPipeR, diagLen, 16);
-    const kickGeom = new BoxGeometry(diagLen, mm(100), mm(6));
-
-    const sidesZ = [];
+    const sidesZ: number[] = [];
     if (side === 'both' || side === 'left') sidesZ.push(-halfWidth - mm(40));
     if (side === 'both' || side === 'right') sidesZ.push(halfWidth + mm(40));
-
-    // Rail rotation quaternion along the flight slope (length along Y in CylinderGeometry)
-    const slopeDir = new Vector3(Math.cos(slopeAngle), Math.sin(slopeAngle), 0).normalize();
-    const railQuat = new Quaternion().setFromUnitVectors(_up, slopeDir);
+    const hoops = obj.handrailHoops !== false;
 
     for (const rz of sidesZ) {
-      // 2 or 3 Stanchions along the stringer (vertical posts)
-      const numStanchions = Math.max(2, Math.ceil(diagLen / mm(1800)) + 1);
-      for (let s = 0; s < numStanchions; s++) {
-        const t = s / (numStanchions - 1);
-        const postX = t * totalRun;
-        const postY = t * totalRise;
-
-        // Vertical post
-        const mPost = new Matrix4().compose(
-          new Vector3(postX, postY + H / 2, rz),
-          _q.identity(),
-          _s,
-        );
-        items.push({ geom: postGeom, matrix: mPost });
-
-        // Spherical balls at top and mid rail joints
-        const mTopBall = new Matrix4().compose(new Vector3(postX, postY + H, rz), _q.identity(), _s);
-        items.push({ geom: ballGeom, matrix: mTopBall });
-
-        const mMidBall = new Matrix4().compose(new Vector3(postX, postY + midH, rz), _q.identity(), _s);
-        items.push({ geom: ballGeom, matrix: mMidBall });
-
-        snapPoints.push([postX, postY + H, rz]);
-      }
-
-      // Continuous Sloping Top Rail
-      const mTopRail = new Matrix4().compose(
-        new Vector3(totalRun / 2, totalRise / 2 + H, rz),
-        railQuat,
-        _s,
-      );
-      items.push({ geom: railGeom, matrix: mTopRail });
-
-      // Continuous Sloping Mid Rail
-      const mMidRail = new Matrix4().compose(
-        new Vector3(totalRun / 2, totalRise / 2 + midH, rz),
-        railQuat,
-        _s,
-      );
-      items.push({ geom: midRailGeom, matrix: mMidRail });
-
-      // Sloping Kickplate along stringer
-      if (obj.hasKickplate) {
-        const kickRotM = new Matrix4().makeBasis(
-          slopeDir,
-          new Vector3(-Math.sin(slopeAngle), Math.cos(slopeAngle), 0),
-          new Vector3(0, 0, 1),
-        );
-        const kickQuat = new Quaternion().setFromRotationMatrix(kickRotM);
-
-        const mKick = new Matrix4().compose(
-          new Vector3(totalRun / 2, totalRise / 2 + mm(55), rz),
-          kickQuat,
-          _s,
-        );
-        items.push({ geom: kickGeom, matrix: mKick });
-      }
+      const rails = buildRailSystem({
+        path: [new Vector3(0, 0, rz), new Vector3(totalRun, totalRise, rz)],
+        height: mm(obj.handrailHeight || 1000),
+        postSpacing: mm(1800),
+        pipeR,
+        midPipeR: pipeR * 0.8,
+        hoopStart: hoops,
+        hoopEnd: hoops,
+        hoopInset: false,
+        kickplate: obj.hasKickplate,
+        mount: 'none',
+        mountSide: 1,
+      });
+      items.push(...rails.items);
+      snapPoints.push(...rails.snapPoints.filter((_, i) => i % 2 === 0));
     }
   }
 

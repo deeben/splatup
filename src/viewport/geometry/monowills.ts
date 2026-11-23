@@ -1,6 +1,5 @@
 import {
   BoxGeometry,
-  BufferAttribute,
   BufferGeometry,
   CylinderGeometry,
   Matrix4,
@@ -10,60 +9,32 @@ import {
 } from 'three';
 import type { HandrailObject, LadderObject, SwingGateObject, Vec3 } from '../../core/types';
 import { mm } from '../../core/frame';
+import { buildRailSystem, layoutRailSystem, mergeGeometries, type RailLayout } from './handrailSystem';
 
 // Reusable scratch objects to avoid allocation
 const _q = new Quaternion();
 const _s = new Vector3(1, 1, 1);
 const _up = new Vector3(0, 1, 0);
 
-/**
- * Merges multiple geometries into a single BufferGeometry using matrix transformations.
- */
-function mergeGeometries(items: { geom: BufferGeometry; matrix: Matrix4 }[]): BufferGeometry {
-  const merged = new BufferGeometry();
-  let totalVerts = 0;
-  let totalIndices = 0;
+/** Scene-space base line for a handrail object (user mm Z-up → three metres Y-up). */
+export function handrailPath(obj: HandrailObject): Vector3[] {
+  const rawPts = obj.points.length >= 2 ? obj.points : [[-1000, 0, 0] as Vec3, [1000, 0, 0] as Vec3];
+  return rawPts.map((p) => new Vector3(mm(p[0]), mm(p[2]), -mm(p[1])));
+}
 
-  for (const { geom } of items) {
-    const pos = geom.getAttribute('position');
-    if (!pos) continue;
-    totalVerts += pos.count;
-    totalIndices += geom.index ? geom.index.count : pos.count;
-  }
+function hoopFlags(obj: HandrailObject) {
+  const h = obj.endHoops ?? 'none';
+  return { hoopStart: h === 'both' || h === 'start', hoopEnd: h === 'both' || h === 'end' };
+}
 
-  const positions = new Float32Array(totalVerts * 3);
-  const indices: number[] = [];
-  let vertOffset = 0;
-
-  for (const { geom, matrix } of items) {
-    const pos = geom.getAttribute('position');
-    if (!pos) continue;
-    const v = new Vector3();
-
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(matrix);
-      positions[(vertOffset + i) * 3] = v.x;
-      positions[(vertOffset + i) * 3 + 1] = v.y;
-      positions[(vertOffset + i) * 3 + 2] = v.z;
-    }
-
-    if (geom.index) {
-      for (let i = 0; i < geom.index.count; i++) {
-        indices.push(geom.index.getX(i) + vertOffset);
-      }
-    } else {
-      for (let i = 0; i < pos.count; i++) {
-        indices.push(i + vertOffset);
-      }
-    }
-
-    vertOffset += pos.count;
-  }
-
-  merged.setAttribute('position', new BufferAttribute(positions, 3));
-  merged.setIndex(indices);
-  merged.computeVertexNormals();
-  return merged;
+/** Stanchion layout for a handrail object (used by the property panel and BOM). */
+export function handrailLayout(obj: HandrailObject): RailLayout {
+  return layoutRailSystem(handrailPath(obj), {
+    height: mm(obj.height),
+    postSpacing: mm(obj.stanchionSpacing),
+    hoopInset: true,
+    ...hoopFlags(obj),
+  });
 }
 
 /**
@@ -73,139 +44,21 @@ export function buildMonowillsHandrail(obj: HandrailObject): {
   geometry: BufferGeometry;
   snapPoints: [number, number, number][];
 } {
-  const items: { geom: BufferGeometry; matrix: Matrix4 }[] = [];
-  const snapPoints: [number, number, number][] = [];
-
-  const H = mm(obj.height); // e.g. 1.0m or 0.9m
-  const midH = H * (obj.height === 1000 ? 0.56 : 0.52); // ~560mm
-  const pipeR = mm(obj.pipeDiameter) / 2; // ~21mm
-  const midPipeR = pipeR * 0.8;
-  const ballR = pipeR * 1.5; // Monowills spherical ball ~64mm dia
-  const baseSize = mm(120);
-  const baseThick = mm(12);
-
-  // Primitive templates
-  const stanchionGeom = new CylinderGeometry(pipeR, pipeR, H, 16);
-  const ballGeom = new SphereGeometry(ballR, 16, 12);
-  const baseGeom = new BoxGeometry(baseSize, baseThick, baseSize);
-  const kickGeom = new BoxGeometry(1, mm(100), mm(6)); // unit length along X, scaled later
-
-  const rawPts = obj.points.length >= 2 ? obj.points : [[-1000, 0, 0] as Vec3, [1000, 0, 0] as Vec3];
-
-  // Convert user frame mm to three scene metres
-  const pathPts: Vector3[] = rawPts.map((p) => new Vector3(mm(p[0]), mm(p[2]), -mm(p[1])));
-
-  for (let s = 0; s < pathPts.length - 1; s++) {
-    const p1 = pathPts[s];
-    const p2 = pathPts[s + 1];
-    const segVec = new Vector3().subVectors(p2, p1);
-    const segLen = segVec.length();
-    if (segLen < 0.001) continue;
-
-    const segDir = segVec.clone().normalize();
-    const stanchionMaxSpacing = mm(obj.stanchionSpacing);
-    const numStanchions = Math.max(2, Math.ceil(segLen / stanchionMaxSpacing) + 1);
-
-    const segAngle = Math.atan2(segDir.x, segDir.z);
-    const postRot = new Quaternion().setFromAxisAngle(_up, segAngle + Math.PI / 2);
-
-    // Place stanchions along this segment
-    for (let i = 0; i < numStanchions; i++) {
-      // Avoid duplicate stanchion on intermediate corner joints
-      if (s > 0 && i === 0) continue;
-
-      const t = i / (numStanchions - 1);
-      const postPos = new Vector3().lerpVectors(p1, p2, t);
-
-      // Base plate: oriented squarely with the handrail run
-      const mBase = new Matrix4().compose(
-        new Vector3(postPos.x, postPos.y + baseThick / 2, postPos.z),
-        postRot,
-        _s,
-      );
-      items.push({ geom: baseGeom, matrix: mBase });
-
-      // Vertical post
-      const mPost = new Matrix4().compose(
-        new Vector3(postPos.x, postPos.y + H / 2, postPos.z),
-        _q.identity(),
-        _s,
-      );
-      items.push({ geom: stanchionGeom, matrix: mPost });
-
-      // Monowills signature balls
-      const mTopBall = new Matrix4().compose(
-        new Vector3(postPos.x, postPos.y + H, postPos.z),
-        _q.identity(),
-        _s,
-      );
-      items.push({ geom: ballGeom, matrix: mTopBall });
-
-      if (obj.hasMidrail) {
-        const mMidBall = new Matrix4().compose(
-          new Vector3(postPos.x, postPos.y + midH, postPos.z),
-          _q.identity(),
-          _s,
-        );
-        items.push({ geom: ballGeom, matrix: mMidBall });
-      }
-
-      snapPoints.push([postPos.x, postPos.y + H, postPos.z]);
-      snapPoints.push([postPos.x, postPos.y, postPos.z]);
-    }
-
-    // Continuous Top Rail tube
-    const railCenter = new Vector3().addVectors(p1, p2).multiplyScalar(0.5);
-    const railQuat = new Quaternion().setFromUnitVectors(_up, segDir);
-    const topRailGeom = new CylinderGeometry(pipeR, pipeR, segLen, 16);
-
-    const mTopRail = new Matrix4().compose(
-      new Vector3(railCenter.x, railCenter.y + H, railCenter.z),
-      railQuat,
-      _s,
-    );
-    items.push({ geom: topRailGeom, matrix: mTopRail });
-
-    // Continuous Mid Rail tube
-    if (obj.hasMidrail) {
-      const midRailGeom = new CylinderGeometry(midPipeR, midPipeR, segLen, 16);
-      const mMidRail = new Matrix4().compose(
-        new Vector3(railCenter.x, railCenter.y + midH, railCenter.z),
-        railQuat,
-        _s,
-      );
-      items.push({ geom: midRailGeom, matrix: mMidRail });
-    }
-
-    // Kickplate / Toeboard (100mm high strip along bottom)
-    if (obj.hasKickplate) {
-      // Orient kickplate in 3D so it pitches and follows sloping runs/stairs
-      const tangent = segDir; // along the length
-      const horizontalNormal = new Vector3(-segDir.z, 0, segDir.x);
-      const normal = horizontalNormal.lengthSq() > 1e-6
-        ? horizontalNormal.normalize()
-        : new Vector3(0, 0, 1);
-      const kickUp = new Vector3().crossVectors(normal, tangent).normalize();
-
-      const kickRotM = new Matrix4().makeBasis(tangent, kickUp, normal);
-      const kickQuat = new Quaternion().setFromRotationMatrix(kickRotM);
-
-      const midBase = new Vector3().addVectors(p1, p2).multiplyScalar(0.5);
-      const kickCenter = midBase.addScaledVector(kickUp, mm(55));
-
-      const mKick = new Matrix4().compose(
-        kickCenter,
-        kickQuat,
-        new Vector3(segLen, 1, 1),
-      );
-      items.push({ geom: kickGeom, matrix: mKick });
-    }
-  }
-
-  return {
-    geometry: mergeGeometries(items),
-    snapPoints,
-  };
+  const pipeR = mm(obj.pipeDiameter) / 2;
+  const { items, snapPoints } = buildRailSystem({
+    path: handrailPath(obj),
+    height: mm(obj.height),
+    postSpacing: mm(obj.stanchionSpacing),
+    pipeR,
+    midPipeR: pipeR * 0.8,
+    hoopInset: true,
+    ...hoopFlags(obj),
+    kickplate: obj.hasKickplate,
+    mount: obj.mount ?? 'base',
+    mountSide: obj.mountSide === 'right' ? -1 : 1,
+    movable: obj.movableSpan ?? null,
+  });
+  return { geometry: mergeGeometries(items), snapPoints };
 }
 
 /**
